@@ -378,7 +378,9 @@ export function useMusicLibrary() {
     useCallback(
       async (
         silent =
-          false
+          false,
+        forceRefresh =
+          true
       ) => {
         /*
          * No ejecutamos dos escaneos
@@ -411,7 +413,9 @@ export function useMusicLibrary() {
 
 
           const result =
-            await getLocalSongs();
+            await getLocalSongs({
+              forceRefresh,
+            });
 
 
           setSourceSongs(
@@ -468,9 +472,40 @@ export function useMusicLibrary() {
 
   useEffect(
     () => {
-      void refresh(
-        false
-      );
+      let cancelled =
+        false;
+
+      /*
+       * 1. Mostramos rápidamente el caché si existe.
+       * 2. Enseguida hacemos un escaneo real y silencioso.
+       *
+       * Así Hmusic abre rápido, pero una canción descargada
+       * mientras la app estaba cerrada también aparece sin
+       * esperar a que caduque el caché de 15 minutos.
+       */
+      const loadLibrary =
+        async () => {
+          await refresh(
+            false,
+            false
+          );
+
+          if (
+            !cancelled
+          ) {
+            await refresh(
+              true,
+              true
+            );
+          }
+        };
+
+      void loadLibrary();
+
+      return () => {
+        cancelled =
+          true;
+      };
     },
     [
       refresh,
@@ -520,6 +555,7 @@ export function useMusicLibrary() {
                * pantalla de carga.
                */
               void refresh(
+                true,
                 true
               );
             }
@@ -592,14 +628,15 @@ export function useMusicLibrary() {
    * AppContext veía una referencia distinta de library.refresh
    * varias veces por segundo y propagaba renders a toda la app.
    *
-   * Este callback es estable y conserva exactamente el mismo
-   * comportamiento funcional.
+   * Este callback es estable y, cuando el usuario actualiza,
+   * fuerza un escaneo real ignorando el caché.
    */
   const publicRefresh =
     useCallback(
       () =>
         refresh(
-          false
+          false,
+          true
         ),
       [
         refresh,

@@ -40,8 +40,9 @@ const LIBRARY_CACHE_VERSION =
  * Durante este tiempo Hmusic puede abrir usando la biblioteca
  * ya procesada, evitando volver a escanear ~2000 canciones.
  *
- * 15 minutos es suficientemente corto para que canciones nuevas
- * aparezcan pronto y suficientemente largo para acelerar reaperturas.
+ * El caché acelera la apertura inicial. useMusicLibrary realiza
+ * después un escaneo real silencioso, por lo que una canción nueva
+ * no tiene que esperar a que caduquen estos 15 minutos.
  */
 const LIBRARY_CACHE_MAX_AGE_MS =
   15 * 60 * 1000;
@@ -68,7 +69,8 @@ interface GetLocalSongsOptions {
    * true:
    * ignora el caché y vuelve a consultar Android.
    *
-   * Útil para un futuro botón "Actualizar biblioteca".
+   * Se usa al actualizar manualmente, al volver a Hmusic
+   * y durante la revalidación silenciosa de la biblioteca.
    */
   forceRefresh?:
     boolean;

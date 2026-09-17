@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Mi Música",
+    "slug": "music-player",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "mimusica",
+    "owner": "jhonas123",
+
+    "icon": "./assets/images/icono.png",
+
+    "android": {
+      "package": "com.musicplayer.mimusica"
+    },
+
+    "plugins": [
+      "expo-router",
+
+      [
+        "expo-media-library",
+        {
+          "granularPermissions": [
+            "audio"
+          ]
+        }
+      ],
+
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false
+        }
+      ],
+
+      "./plugins/withHmusicExpoAudioPatch.cjs"
+    ],
+
+    "experiments": {
+      "typedRoutes": true
+    },
+
+    "extra": {
+      "eas": {
+        "projectId": "5a1d1b65-8c33-4f5d-a0be-cbb4fb07fedd"
+      }
+    }
+  }
+}

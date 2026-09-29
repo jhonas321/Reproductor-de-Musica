@@ -7,6 +7,10 @@ import {
 } from 'expo-status-bar';
 
 import {
+  useEffect,
+} from 'react';
+
+import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 
@@ -17,8 +21,28 @@ import {
 import GlobalPlayer
   from '../components/GlobalPlayer';
 
+import {
+  setupTrackPlayer,
+} from '../services/trackPlayerSetup';
+
 
 export default function RootLayout() {
+  useEffect(
+    () => {
+      void setupTrackPlayer()
+        .catch(
+          error => {
+            console.log(
+              'Error inicializando Track Player:',
+              error
+            );
+          }
+        );
+    },
+    []
+  );
+
+
   return (
     <GestureHandlerRootView
       style={{

@@ -654,7 +654,7 @@ function buildSongs(
         ) || 0,
 
       /*
-       * URI utilizada por expo-audio.
+       *URI utilizada por el reproductor.
        */
       uri:
         track.url,

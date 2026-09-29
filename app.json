@@ -24,18 +24,7 @@
             "audio"
           ]
         }
-      ],
-
-      [
-        "expo-audio",
-        {
-          "recordAudioAndroid": false,
-          "enableBackgroundPlayback": true,
-          "enableBackgroundRecording": false
-        }
-      ],
-
-      "./plugins/withHmusicExpoAudioPatch.cjs"
+      ]
     ],
 
     "experiments": {

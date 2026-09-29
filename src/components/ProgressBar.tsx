@@ -114,7 +114,7 @@ export default function ProgressBar({
   /*
    * Evita el salto visual:
    * destino -> tiempo viejo -> destino
-   * mientras expo-audio confirma el seek.
+   * mientras el reproductor confirma el seek
    */
   const [
     pendingSeek,
@@ -290,7 +290,7 @@ export default function ProgressBar({
 
 
       /*
-       * Fallback por si el estado de expo-audio tarda
+       * Fallback por si el estado del reproductor tarda
        * demasiado en reflejar la nueva posición.
        */
       pendingTimerRef.current =

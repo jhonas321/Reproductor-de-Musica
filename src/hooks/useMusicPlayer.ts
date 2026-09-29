@@ -1,14 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-import {
-  setAudioModeAsync,
-  useAudioPlayer,
-  useAudioPlayerStatus,
-} from 'expo-audio';
-
-import {
-  requireNativeModule,
-} from 'expo-modules-core';
+import TrackPlayer, {
+  RepeatMode as TrackRepeatMode,
+  useActiveMediaItem,
+  useIsPlaying,
+  useProgress,
+} from '@rntp/player';
 
 import {
   useCallback,
@@ -28,15 +24,12 @@ import {
 } from '../utils/music';
 
 import {
-  getLockScreenArtworkUrl,
-} from '../services/lockScreenArtwork';
+  setupTrackPlayer,
+} from '../services/trackPlayerSetup';
 
 
 const PLAYER_STATE_KEY =
   '@musicplayer/player-state';
-
-const EQUALIZER_STATE_KEY =
-  '@hmusic/equalizer-state-v1';
 
 const MAX_HISTORY_ITEMS =
   100;
@@ -69,60 +62,12 @@ interface SavedPlayerState {
 }
 
 
-type RemoteSubscription = {
-  remove:
-    () => void;
-};
-
-
-type HmusicRemoteAudioPlayer = {
-  setActiveForLockScreen:
-    (
-      active:
-        boolean,
-
-      metadata?: {
-        title?:
-          string;
-
-        artist?:
-          string;
-
-        albumTitle?:
-          string;
-
-        artworkUrl?:
-          string;
-      },
-
-      options?: {
-        showSeekForward?:
-          boolean;
-
-        showSeekBackward?:
-          boolean;
-
-        showNextTrack?:
-          boolean;
-
-        showPreviousTrack?:
-          boolean;
-      }
-    ) => void;
-
-  addListener:
-    (
-      eventName:
-        | 'onRemoteNextTrack'
-        | 'onRemotePreviousTrack',
-
-      listener:
-        () => void
-    ) =>
-      RemoteSubscription;
-};
-
-
+/*
+ * Estas interfaces se conservan para no romper los componentes
+ * que todavía muestran la interfaz del ecualizador.
+ *
+ * El ecualizador se conectará después a un módulo nativo separado.
+ */
 export interface HmusicEqualizerBand {
   index:
     number;
@@ -156,89 +101,27 @@ export interface HmusicEqualizerInfo {
 }
 
 
-interface SavedEqualizerState {
-  enabled:
-    boolean;
+function emptyEqualizerInfo(): HmusicEqualizerInfo {
+  return {
+    supported:
+      false,
 
-  levelsMb:
-    number[];
+    enabled:
+      false,
+
+    audioSessionId:
+      0,
+
+    minLevelMb:
+      0,
+
+    maxLevelMb:
+      0,
+
+    bands:
+      [],
+  };
 }
-
-
-type HmusicEqualizerNativeModule = {
-  hmusicGetEqualizerInfo:
-    (
-      playerId:
-        string
-    ) =>
-      HmusicEqualizerInfo;
-
-  hmusicSetEqualizerEnabled:
-    (
-      playerId:
-        string,
-
-      enabled:
-        boolean
-    ) => {
-      enabled:
-        boolean;
-    };
-
-  hmusicSetEqualizerBandLevel:
-    (
-      playerId:
-        string,
-
-      bandIndex:
-        number,
-
-      levelMb:
-        number
-    ) => {
-      bandIndex:
-        number;
-
-      levelMb:
-        number;
-    };
-
-  hmusicSetEqualizerLevels:
-    (
-      playerId:
-        string,
-
-      levelsMb:
-        number[]
-    ) => {
-      levelsMb:
-        number[];
-    };
-
-  hmusicResetEqualizer:
-    (
-      playerId:
-        string
-    ) => {
-      levelsMb:
-        number[];
-    };
-};
-
-
-const ExpoAudioEqualizer =
-  requireNativeModule<
-    HmusicEqualizerNativeModule
-  >(
-    'ExpoAudio'
-  );
-
-  console.log(
-    'HMUSIC ExpoAudio keys:',
-    Object.keys(
-      ExpoAudioEqualizer
-    )
-  );
 
 
 function isRepeatMode(
@@ -267,6 +150,45 @@ function safePosition(
 }
 
 
+function songToMediaItem(
+  song:
+    Song
+) {
+  return {
+    mediaId:
+      song.id,
+
+    url:
+      song.contentUri ||
+      song.uri,
+
+    title:
+      song.title,
+
+    artist:
+      song.artist,
+
+    albumTitle:
+      song.album,
+
+    duration:
+      song.duration,
+
+    ...(song.artwork
+      ? {
+          artworkUrl:
+            song.artwork,
+        }
+      : {}),
+
+    extras: {
+      songId:
+        song.id,
+    },
+  };
+}
+
+
 export function useMusicPlayer(
   songs:
     Song[],
@@ -274,36 +196,17 @@ export function useMusicPlayer(
   resumeLastSong:
     boolean
 ) {
-  const player =
-    useAudioPlayer(
-      null,
-      {
-        updateInterval:
-          250,
-      }
+  const isPlaying =
+    useIsPlaying();
+
+  const progress =
+    useProgress(
+      0.25
     );
 
-  const status =
-    useAudioPlayerStatus(
-      player
-    );
+  const activeMediaItem =
+    useActiveMediaItem();
 
-
-  /*
-   * currentTime cambia cada ~250 ms. Lo guardamos en un ref
-   * para que callbacks públicos como previous() no cambien de
-   * identidad en cada tick y no obliguen a re-renderizar las
-   * FlatList grandes a través de AppContext.
-   */
-  const currentTimeRef =
-    useRef(
-      0
-    );
-
-
-  currentTimeRef.current =
-    status.currentTime ||
-    0;
 
   const [
     currentSong,
@@ -315,6 +218,7 @@ export function useMusicPlayer(
       null
     );
 
+
   const [
     queue,
     setQueue,
@@ -325,13 +229,6 @@ export function useMusicPlayer(
       []
     );
 
-  const [
-    optimisticPlaying,
-    setOptimisticPlaying,
-  ] =
-    useState(
-      false
-    );
 
   const [
     shuffle,
@@ -340,6 +237,7 @@ export function useMusicPlayer(
     useState(
       false
     );
+
 
   const [
     repeatMode,
@@ -351,20 +249,18 @@ export function useMusicPlayer(
       'off'
     );
 
+
   const restored =
     useRef(
       false
     );
 
-  const previousFinished =
-    useRef(
-      false
-    );
 
   const lastSavedBucket =
     useRef(
       -1
     );
+
 
   const historyRef =
     useRef<
@@ -374,141 +270,15 @@ export function useMusicPlayer(
     );
 
 
-  const equalizerRestored =
+  const currentTimeRef =
     useRef(
-      false
+      0
     );
 
 
-  const equalizerSaveTimer =
-    useRef<
-      ReturnType<
-        typeof setTimeout
-      > | null
-    >(
-      null
-    );
-
-
-  /* =========================================================
-     AUDIO MODE
-  ========================================================= */
-
-  useEffect(
-    () => {
-      setAudioModeAsync({
-        playsInSilentMode:
-          true,
-
-        shouldPlayInBackground:
-          true,
-
-        interruptionMode:
-          'doNotMix',
-      }).catch(
-        error => {
-          console.log(
-            'Audio mode:',
-            error
-          );
-        }
-      );
-    },
-    []
-  );
-
-
-  /* =========================================================
-     ESTADO REAL DE REPRODUCCIÓN
-  ========================================================= */
-
-  useEffect(
-    () => {
-      setOptimisticPlaying(
-        Boolean(
-          status.playing
-        )
-      );
-    },
-    [
-      status.playing,
-    ]
-  );
-
-
-  /* =========================================================
-     LOCK SCREEN / MEDIA SESSION
-  ========================================================= */
-
-  const activateLockScreen =
-    useCallback(
-      (
-        song:
-          Song
-      ) => {
-        void (
-          async () => {
-            try {
-              const remotePlayer =
-                player as unknown as
-                  HmusicRemoteAudioPlayer;
-
-              const artworkUrl =
-                await getLockScreenArtworkUrl(
-                  song.artwork,
-                  song.id
-                );
-
-              remotePlayer
-                .setActiveForLockScreen(
-                  true,
-                  {
-                    title:
-                      song.title,
-
-                    artist:
-                      song.artist,
-
-                    albumTitle:
-                      song.album,
-
-                    ...(
-                      artworkUrl
-                        ? {
-                            artworkUrl,
-                          }
-                        : {}
-                    ),
-                  },
-                  {
-                    showSeekForward:
-                      false,
-
-                    showSeekBackward:
-                      false,
-
-                    showNextTrack:
-                      true,
-
-                    showPreviousTrack:
-                      true,
-                  }
-                );
-            } catch (
-              error
-            ) {
-              console.log(
-                'Lock screen:',
-                error
-              );
-            }
-          }
-        )();
-      },
-      [
-        player,
-      ]
-    );
+  currentTimeRef.current =
+    progress.position ||
+    0;
 
 
   /* =========================================================
@@ -610,6 +380,67 @@ export function useMusicPlayer(
 
 
   /* =========================================================
+     SINCRONIZAR CANCIÓN ACTIVA DESDE RNTP
+     Esto permite que Next/Previous desde notificación, lockscreen
+     o audífonos también actualicen la interfaz.
+  ========================================================= */
+
+  useEffect(
+    () => {
+      const mediaId =
+        activeMediaItem
+          ?.mediaId;
+
+      if (
+        !mediaId
+      ) {
+        return;
+      }
+
+      const song =
+        activeQueue.find(
+          item =>
+            item.id ===
+            mediaId
+        ) ||
+        songs.find(
+          item =>
+            item.id ===
+            mediaId
+        );
+
+      if (
+        !song
+      ) {
+        return;
+      }
+
+      setCurrentSong(
+        current => {
+          if (
+            current &&
+            current.id !==
+              song.id
+          ) {
+            pushHistory(
+              current.id
+            );
+          }
+
+          return song;
+        }
+      );
+    },
+    [
+      activeMediaItem?.mediaId,
+      activeQueue,
+      songs,
+      pushHistory,
+    ]
+  );
+
+
+  /* =========================================================
      PERSISTENCIA
   ========================================================= */
 
@@ -694,6 +525,8 @@ export function useMusicPlayer(
       void (
         async () => {
           try {
+            await setupTrackPlayer();
+
             const raw =
               await AsyncStorage
                 .getItem(
@@ -772,19 +605,42 @@ export function useMusicPlayer(
                   -MAX_HISTORY_ITEMS
                 );
 
-            setShuffle(
-              Boolean(
-                saved.shuffle
-              )
-            );
-
-            setRepeatMode(
+            const restoredRepeatMode:
+              RepeatMode =
               isRepeatMode(
                 saved.repeatMode
               )
                 ? saved.repeatMode
-                : 'off'
+                : 'off';
+
+            setRepeatMode(
+              restoredRepeatMode
             );
+
+            TrackPlayer
+              .setRepeatMode(
+                restoredRepeatMode ===
+                  'one'
+                  ? TrackRepeatMode.One
+                  : restoredRepeatMode ===
+                      'all'
+                    ? TrackRepeatMode.All
+                    : TrackRepeatMode.Off
+              );
+
+            const restoredShuffle =
+              Boolean(
+                saved.shuffle
+              );
+
+            setShuffle(
+              restoredShuffle
+            );
+
+            TrackPlayer
+              .setShuffleEnabled(
+                restoredShuffle
+              );
 
             if (!song) {
               return;
@@ -812,6 +668,17 @@ export function useMusicPlayer(
                     ...safeQueue,
                   ]);
 
+            const index =
+              Math.max(
+                0,
+                queueWithSong
+                  .findIndex(
+                    item =>
+                      item.id ===
+                      song.id
+                  )
+              );
+
             setQueue(
               queueWithSong
             );
@@ -820,19 +687,13 @@ export function useMusicPlayer(
               song
             );
 
-            previousFinished.current =
-              false;
-
-            lastSavedBucket.current =
-              -1;
-
-            player.replace(
-              song.uri
-            );
-
-            activateLockScreen(
-              song
-            );
+            TrackPlayer
+              .setMediaItems(
+                queueWithSong.map(
+                  songToMediaItem
+                ),
+                index
+              );
 
             const position =
               safePosition(
@@ -843,15 +704,16 @@ export function useMusicPlayer(
               position >
               0
             ) {
-              await player
+              TrackPlayer
                 .seekTo(
                   position
                 );
             }
 
-            setOptimisticPlaying(
-              false
-            );
+            /*
+             * Restauramos la canción y la posición,
+             * pero no reproducimos automáticamente.
+             */
           } catch (
             error
           ) {
@@ -866,8 +728,6 @@ export function useMusicPlayer(
     [
       songs,
       resumeLastSong,
-      player,
-      activateLockScreen,
     ]
   );
 
@@ -885,7 +745,7 @@ export function useMusicPlayer(
       }
 
       const currentTime =
-        status.currentTime ||
+        progress.position ||
         0;
 
       const bucket =
@@ -909,7 +769,7 @@ export function useMusicPlayer(
       );
     },
     [
-      status.currentTime,
+      progress.position,
       currentSong,
       persist,
     ]
@@ -925,7 +785,7 @@ export function useMusicPlayer(
       }
 
       void persist(
-        status.currentTime ||
+        progress.position ||
         0
       );
     },
@@ -945,7 +805,7 @@ export function useMusicPlayer(
 
   const loadSong =
     useCallback(
-      (
+      async (
         song:
           Song,
 
@@ -958,6 +818,8 @@ export function useMusicPlayer(
         recordHistory =
           true
       ) => {
+        await setupTrackPlayer();
+
         const nextQueue =
           buildQueueForSong(
             song,
@@ -975,11 +837,16 @@ export function useMusicPlayer(
           );
         }
 
-        previousFinished.current =
-          false;
-
-        lastSavedBucket.current =
-          -1;
+        const index =
+          Math.max(
+            0,
+            nextQueue
+              .findIndex(
+                item =>
+                  item.id ===
+                  song.id
+              )
+          );
 
         setQueue(
           nextQueue
@@ -989,34 +856,28 @@ export function useMusicPlayer(
           song
         );
 
-        player.replace(
-          song.uri
-        );
+        lastSavedBucket.current =
+          -1;
 
-        activateLockScreen(
-          song
-        );
+        TrackPlayer
+          .setMediaItems(
+            nextQueue.map(
+              songToMediaItem
+            ),
+            index
+          );
 
         if (
           autoPlay
         ) {
-          setOptimisticPlaying(
-            true
-          );
-
-          player.play();
-        } else {
-          setOptimisticPlaying(
-            false
-          );
+          TrackPlayer
+            .play();
         }
       },
       [
         buildQueueForSong,
         currentSong,
         pushHistory,
-        player,
-        activateLockScreen,
       ]
     );
 
@@ -1027,13 +888,15 @@ export function useMusicPlayer(
 
   const playSong =
     useCallback(
-      (
+      async (
         song:
           Song,
 
         sourceQueue?:
           Song[]
       ) => {
+        await setupTrackPlayer();
+
         if (
           currentSong?.id ===
           song.id
@@ -1041,40 +904,65 @@ export function useMusicPlayer(
           if (
             sourceQueue &&
             sourceQueue.length >
-              0
+            0
           ) {
-            setQueue(
+            const nextQueue =
               buildQueueForSong(
                 song,
                 sourceQueue
-              )
+              );
+
+            const currentPosition =
+              progress.position ||
+              0;
+
+            const index =
+              Math.max(
+                0,
+                nextQueue.findIndex(
+                  item =>
+                    item.id ===
+                    song.id
+                )
+              );
+
+            setQueue(
+              nextQueue
             );
+
+            TrackPlayer
+              .setMediaItems(
+                nextQueue.map(
+                  songToMediaItem
+                ),
+                index
+              );
+
+            if (
+              currentPosition >
+              0
+            ) {
+              TrackPlayer
+                .seekTo(
+                  currentPosition
+                );
+            }
           }
 
           if (
-            optimisticPlaying
+            isPlaying
           ) {
-            setOptimisticPlaying(
-              false
-            );
-
-            player.pause();
+            TrackPlayer
+              .pause();
           } else {
-            setOptimisticPlaying(
-              true
-            );
-
-            activateLockScreen(
-              song
-            );
-
-            player.play();
+            TrackPlayer
+              .play();
           }
 
           return;
         }
 
-        loadSong(
+        await loadSong(
           song,
           sourceQueue,
           true
@@ -1082,11 +970,10 @@ export function useMusicPlayer(
       },
       [
         currentSong,
-        optimisticPlaying,
-        player,
-        activateLockScreen,
+        isPlaying,
         loadSong,
         buildQueueForSong,
+        progress.position,
       ]
     );
 
@@ -1097,13 +984,15 @@ export function useMusicPlayer(
 
   const playAll =
     useCallback(
-      (
+      async (
         sourceQueue:
           Song[],
 
         startIndex =
           0
       ) => {
+        await setupTrackPlayer();
+
         const cleanQueue =
           uniqueSongs(
             sourceQueue
@@ -1122,21 +1011,35 @@ export function useMusicPlayer(
             Math.min(
               startIndex,
               cleanQueue.length -
-                1
+              1
             )
           );
 
-        loadSong(
+        setQueue(
+          cleanQueue
+        );
+
+        setCurrentSong(
           cleanQueue[
             index
-          ],
-          cleanQueue,
-          true
+          ]
         );
+
+        lastSavedBucket.current =
+          -1;
+
+        TrackPlayer
+          .setMediaItems(
+            cleanQueue.map(
+              songToMediaItem
+            ),
+            index
+          );
+
+        TrackPlayer
+          .play();
       },
-      [
-        loadSong,
-      ]
+      []
     );
 
 
@@ -1146,100 +1049,53 @@ export function useMusicPlayer(
 
   const pause =
     useCallback(
-      () => {
-        setOptimisticPlaying(
-          false
-        );
+      async () => {
+        await setupTrackPlayer();
 
-        player.pause();
+        TrackPlayer
+          .pause();
       },
-      [
-        player,
-      ]
+      []
     );
 
 
   const togglePlayPause =
     useCallback(
-      () => {
+      async () => {
         if (
           !currentSong
         ) {
           return;
         }
 
+        await setupTrackPlayer();
+
         if (
-          optimisticPlaying
+          isPlaying
         ) {
-          pause();
-
-          return;
+          TrackPlayer
+            .pause();
+        } else {
+          TrackPlayer
+            .play();
         }
-
-        setOptimisticPlaying(
-          true
-        );
-
-        activateLockScreen(
-          currentSong
-        );
-
-        player.play();
       },
       [
         currentSong,
-        optimisticPlaying,
-        pause,
-        activateLockScreen,
-        player,
-      ]
-    );
-
-
-  /* =========================================================
-     SHUFFLE
-  ========================================================= */
-
-  const getRandomIndex =
-    useCallback(
-      () => {
-        if (
-          activeQueue.length <=
-          1
-        ) {
-          return 0;
-        }
-
-        let result =
-          currentIndex;
-
-        while (
-          result ===
-          currentIndex
-        ) {
-          result =
-            Math.floor(
-              Math.random() *
-              activeQueue.length
-            );
-        }
-
-        return result;
-      },
-      [
-        activeQueue.length,
-        currentIndex,
+        isPlaying,
       ]
     );
 
 
   /* =========================================================
      SIGUIENTE
+     RNTP controla el orden nativo. Si shuffle está activo,
+     RNTP elige la siguiente pista de su cola aleatoria.
   ========================================================= */
 
   const next =
     useCallback(
-      () => {
+      async () => {
         if (
           !currentSong ||
           activeQueue.length ===
@@ -1248,49 +1104,38 @@ export function useMusicPlayer(
           return;
         }
 
-        if (
-          shuffle
+        await setupTrackPlayer();
+
+        try {
+          TrackPlayer
+            .skipToNext();
+
+          TrackPlayer
+            .play();
+        } catch (
+          error
         ) {
-          loadSong(
-            activeQueue[
-              getRandomIndex()
-            ],
-            activeQueue,
-            true
+          /*
+           * Si estamos al final y repeat está apagado,
+           * no forzamos un salto manual.
+           */
+          console.log(
+            'No hay siguiente canción:',
+            error
           );
-
-          return;
         }
-
-        const index =
-          currentIndex >=
-          activeQueue.length -
-            1
-            ? 0
-            : currentIndex +
-              1;
-
-        loadSong(
-          activeQueue[
-            index
-          ],
-          activeQueue,
-          true
-        );
       },
       [
         currentSong,
-        activeQueue,
-        shuffle,
-        currentIndex,
-        getRandomIndex,
-        loadSong,
+        activeQueue.length,
       ]
     );
 
 
   /* =========================================================
      ANTERIOR
+     Si la canción ya avanzó más de 3 segundos, vuelve al inicio.
+     Si no, RNTP retrocede en su propia cola (incluido shuffle).
   ========================================================= */
 
   const previous =
@@ -1304,74 +1149,13 @@ export function useMusicPlayer(
           return;
         }
 
-        if (
-          shuffle
-        ) {
-          const queueIds =
-            new Set(
-              activeQueue.map(
-                song =>
-                  song.id
-              )
-            );
-
-          let previousSong:
-            Song | undefined;
-
-          while (
-            historyRef.current.length >
-              0 &&
-            !previousSong
-          ) {
-            const previousId =
-              historyRef.current
-                .pop();
-
-            if (
-              !previousId ||
-              previousId ===
-                currentSong.id ||
-              !queueIds.has(
-                previousId
-              )
-            ) {
-              continue;
-            }
-
-            previousSong =
-              activeQueue.find(
-                song =>
-                  song.id ===
-                  previousId
-              );
-          }
-
-          if (
-            previousSong
-          ) {
-            loadSong(
-              previousSong,
-              activeQueue,
-              true,
-              false
-            );
-
-            return;
-          }
-
-          await player
-            .seekTo(
-              0
-            );
-
-          return;
-        }
+        await setupTrackPlayer();
 
         if (
           currentTimeRef.current >
           PREVIOUS_RESTART_SECONDS
         ) {
-          await player
+          TrackPlayer
             .seekTo(
               0
             );
@@ -1379,85 +1163,31 @@ export function useMusicPlayer(
           return;
         }
 
-        const index =
-          currentIndex <=
-          0
-            ? activeQueue.length -
-              1
-            : currentIndex -
-              1;
+        try {
+          TrackPlayer
+            .skipToPrevious();
 
-        loadSong(
-          activeQueue[
-            index
-          ],
-          activeQueue,
-          true
-        );
+          TrackPlayer
+            .play();
+        } catch (
+          error
+        ) {
+          TrackPlayer
+            .seekTo(
+              0
+            );
+
+          console.log(
+            'No hay canción anterior:',
+            error
+          );
+        }
       },
       [
         currentSong,
-        activeQueue,
-        player,
-        shuffle,
-        currentIndex,
-        loadSong,
+        activeQueue.length,
       ]
     );
-
-
-  /* =========================================================
-     CONTROLES REMOTOS
-  ========================================================= */
-
-  useEffect(
-    () => {
-      const remotePlayer =
-        player as unknown as
-          Partial<
-            HmusicRemoteAudioPlayer
-          >;
-
-      if (
-        typeof remotePlayer
-          .addListener !==
-        'function'
-      ) {
-        return;
-      }
-
-      const nextSubscription =
-        remotePlayer
-          .addListener(
-            'onRemoteNextTrack',
-            () => {
-              next();
-            }
-          );
-
-      const previousSubscription =
-        remotePlayer
-          .addListener(
-            'onRemotePreviousTrack',
-            () => {
-              void previous();
-            }
-          );
-
-      return () => {
-        nextSubscription
-          .remove();
-
-        previousSubscription
-          .remove();
-      };
-    },
-    [
-      player,
-      next,
-      previous,
-    ]
-  );
 
 
   /* =========================================================
@@ -1478,15 +1208,17 @@ export function useMusicPlayer(
           return;
         }
 
+        await setupTrackPlayer();
+
         const max =
           (
-            status.duration ||
+            progress.duration ||
             currentSong?.duration ||
             0
           ) >
           0
             ? (
-                status.duration ||
+                progress.duration ||
                 currentSong?.duration ||
                 0
               )
@@ -1501,50 +1233,78 @@ export function useMusicPlayer(
             max
           );
 
-        await player
+        TrackPlayer
           .seekTo(
             target
           );
       },
       [
-        player,
-        status.duration,
+        progress.duration,
         currentSong?.duration,
       ]
     );
 
 
   /* =========================================================
-     MODOS
+     MODOS: SHUFFLE / REPEAT
   ========================================================= */
 
   const toggleShuffle =
     useCallback(
-      () => {
+      async () => {
+        await setupTrackPlayer();
+
+        const nextValue =
+          !shuffle;
+
+        TrackPlayer
+          .setShuffleEnabled(
+            nextValue
+          );
+
         setShuffle(
-          current =>
-            !current
+          nextValue
         );
       },
-      []
+      [
+        shuffle,
+      ]
     );
 
 
   const cycleRepeatMode =
     useCallback(
-      () => {
-        setRepeatMode(
-          current =>
-            current ===
+      async () => {
+        await setupTrackPlayer();
+
+        const nextMode:
+          RepeatMode =
+          repeatMode ===
             'off'
-              ? 'all'
-              : current ===
+            ? 'all'
+            : repeatMode ===
+                'all'
+              ? 'one'
+              : 'off';
+
+        TrackPlayer
+          .setRepeatMode(
+            nextMode ===
+              'one'
+              ? TrackRepeatMode.One
+              : nextMode ===
                   'all'
-                ? 'one'
-                : 'off'
+                ? TrackRepeatMode.All
+                : TrackRepeatMode.Off
+          );
+
+        setRepeatMode(
+          nextMode
         );
       },
-      []
+      [
+        repeatMode,
+      ]
     );
 
 
@@ -1554,7 +1314,7 @@ export function useMusicPlayer(
 
   const playNext =
     useCallback(
-      (
+      async (
         song:
           Song
       ) => {
@@ -1585,21 +1345,73 @@ export function useMusicPlayer(
                 )
             : -1;
 
-        filtered.splice(
+        const insertIndex =
           Math.max(
             0,
             index +
               1
-          ),
+          );
+
+        filtered.splice(
+          insertIndex,
           0,
           song
         );
 
-        setQueue(
+        const nextQueue =
           uniqueSongs(
             filtered
-          )
+          );
+
+        setQueue(
+          nextQueue
         );
+
+        if (
+          currentSong
+        ) {
+          await setupTrackPlayer();
+
+          const nativeQueue =
+            TrackPlayer
+              .getQueue();
+
+          const alreadyIndex =
+            nativeQueue.findIndex(
+              item =>
+                item.mediaId ===
+                song.id
+            );
+
+          if (
+            alreadyIndex >=
+            0
+          ) {
+            TrackPlayer
+              .removeMediaItem(
+                alreadyIndex
+              );
+          }
+
+          const activeIndex =
+            TrackPlayer
+              .getActiveMediaItemIndex();
+
+          TrackPlayer
+            .insertMediaItem(
+              Math.max(
+                0,
+                (
+                  activeIndex ??
+                  0
+                ) +
+                1
+              ),
+              songToMediaItem(
+                song
+              )
+            );
+        }
       },
       [
         activeQueue,
@@ -1615,39 +1427,50 @@ export function useMusicPlayer(
 
   const addToQueue =
     useCallback(
-      (
+      async (
         song:
           Song
       ) => {
+        const base =
+          queue.length >
+          0
+            ? queue
+            : activeQueue;
+
+        if (
+          base.some(
+            item =>
+              item.id ===
+              song.id
+          )
+        ) {
+          return;
+        }
+
         setQueue(
-          current => {
-            const base =
-              current.length >
-              0
-                ? current
-                : activeQueue;
-
-            if (
-              base.some(
-                item =>
-                  item.id ===
-                  song.id
-              )
-            ) {
-              return [
-                ...base,
-              ];
-            }
-
-            return uniqueSongs([
-              ...base,
-              song,
-            ]);
-          }
+          uniqueSongs([
+            ...base,
+            song,
+          ])
         );
+
+        if (
+          currentSong
+        ) {
+          await setupTrackPlayer();
+
+          TrackPlayer
+            .addMediaItem(
+              songToMediaItem(
+                song
+              )
+            );
+        }
       },
       [
+        queue,
         activeQueue,
+        currentSong,
       ]
     );
 
@@ -1658,7 +1481,7 @@ export function useMusicPlayer(
 
   const removeFromQueue =
     useCallback(
-      (
+      async (
         songId:
           string
       ) => {
@@ -1669,24 +1492,64 @@ export function useMusicPlayer(
           return;
         }
 
-        setQueue(
-          current => {
-            const base =
-              current.length >
-              0
-                ? current
-                : activeQueue;
+        const base =
+          queue.length >
+          0
+            ? queue
+            : activeQueue;
 
-            return base.filter(
+        const index =
+          base.findIndex(
+            item =>
+              item.id ===
+              songId
+          );
+
+        if (
+          index <
+          0
+        ) {
+          return;
+        }
+
+        setQueue(
+          base.filter(
+            item =>
+              item.id !==
+              songId
+          )
+        );
+
+        if (
+          currentSong
+        ) {
+          await setupTrackPlayer();
+
+          const nativeQueue =
+            TrackPlayer
+              .getQueue();
+
+          const nativeIndex =
+            nativeQueue.findIndex(
               item =>
-                item.id !==
+                item.mediaId ===
                 songId
             );
+
+          if (
+            nativeIndex >=
+            0
+          ) {
+            TrackPlayer
+              .removeMediaItem(
+                nativeIndex
+              );
           }
-        );
+        }
       },
       [
         currentSong,
+        queue,
         activeQueue,
       ]
     );
@@ -1698,62 +1561,74 @@ export function useMusicPlayer(
 
   const moveQueueItem =
     useCallback(
-      (
+      async (
         from:
           number,
 
         to:
           number
       ) => {
-        setQueue(
-          current => {
-            const base =
-              current.length >
-              0
-                ? [
-                    ...current,
-                  ]
-                : [
-                    ...activeQueue,
-                  ];
+        const base =
+          queue.length >
+          0
+            ? [
+                ...queue,
+              ]
+            : [
+                ...activeQueue,
+              ];
 
-            if (
-              from < 0 ||
-              to < 0 ||
-              from >=
-                base.length ||
-              to >=
-                base.length ||
-              from ===
-                to
-            ) {
-              return base;
-            }
+        if (
+          from < 0 ||
+          to < 0 ||
+          from >=
+            base.length ||
+          to >=
+            base.length ||
+          from ===
+            to
+        ) {
+          return;
+        }
 
-            const [
-              moved,
-            ] =
-              base.splice(
-                from,
-                1
-              );
+        const [
+          moved,
+        ] =
+          base.splice(
+            from,
+            1
+          );
 
-            if (!moved) {
-              return base;
-            }
+        if (!moved) {
+          return;
+        }
 
-            base.splice(
-              to,
-              0,
-              moved
-            );
-
-            return base;
-          }
+        base.splice(
+          to,
+          0,
+          moved
         );
+
+        setQueue(
+          base
+        );
+
+        if (
+          currentSong
+        ) {
+          await setupTrackPlayer();
+
+          TrackPlayer
+            .moveMediaItem(
+              from,
+              to
+            );
+        }
       },
       [
+        queue,
         activeQueue,
+        currentSong,
       ]
     );
 
@@ -1764,7 +1639,7 @@ export function useMusicPlayer(
 
   const clearQueue =
     useCallback(
-      () => {
+      async () => {
         setQueue(
           currentSong
             ? [
@@ -1772,6 +1647,51 @@ export function useMusicPlayer(
               ]
             : []
         );
+
+        if (
+          !currentSong
+        ) {
+          await setupTrackPlayer();
+
+          TrackPlayer
+            .clear();
+
+          return;
+        }
+
+        await setupTrackPlayer();
+
+        const nativeQueue =
+          TrackPlayer
+            .getQueue();
+
+        const activeIndex =
+          TrackPlayer
+            .getActiveMediaItemIndex();
+
+        /*
+         * Quitamos todas las canciones excepto la activa,
+         * empezando desde el final para no desplazar índices.
+         */
+        for (
+          let index =
+            nativeQueue.length -
+            1;
+          index >=
+          0;
+          index -=
+          1
+        ) {
+          if (
+            index !==
+            activeIndex
+          ) {
+            TrackPlayer
+              .removeMediaItem(
+                index
+              );
+          }
+        }
       },
       [
         currentSong,
@@ -1780,418 +1700,65 @@ export function useMusicPlayer(
 
 
   /* =========================================================
-     ECUALIZADOR ANDROID
+     ECUALIZADOR
+     Se conectará después a un módulo nativo separado.
   ========================================================= */
-
-  const scheduleEqualizerSave =
-    useCallback(
-      (
-        info:
-          HmusicEqualizerInfo
-      ) => {
-        if (
-          equalizerSaveTimer.current
-        ) {
-          clearTimeout(
-            equalizerSaveTimer.current
-          );
-        }
-
-        equalizerSaveTimer.current =
-          setTimeout(
-            () => {
-              const saved:
-                SavedEqualizerState = {
-                enabled:
-                  info.enabled,
-
-                levelsMb:
-                  info.bands.map(
-                    band =>
-                      band.levelMb
-                  ),
-              };
-
-              void AsyncStorage
-                .setItem(
-                  EQUALIZER_STATE_KEY,
-                  JSON.stringify(
-                    saved
-                  )
-                )
-                .catch(
-                  error => {
-                    console.log(
-                      'Error guardando ecualizador:',
-                      error
-                    );
-                  }
-                );
-            },
-            280
-          );
-      },
-      []
-    );
-
 
   const getEqualizerInfo =
     useCallback(
       async () => {
-        return ExpoAudioEqualizer
-          .hmusicGetEqualizerInfo(
-            player.id
-          );
+        return emptyEqualizerInfo();
       },
-      [
-        player.id,
-      ]
+      []
     );
 
 
   const setEqualizerEnabled =
     useCallback(
       async (
-        enabled:
+        _enabled:
           boolean
       ) => {
-        ExpoAudioEqualizer
-          .hmusicSetEqualizerEnabled(
-            player.id,
-            enabled
-          );
-
-        const info =
-          ExpoAudioEqualizer
-            .hmusicGetEqualizerInfo(
-              player.id
-            );
-
-        scheduleEqualizerSave(
-          info
-        );
-
-        return info;
+        return emptyEqualizerInfo();
       },
-      [
-        player.id,
-        scheduleEqualizerSave,
-      ]
+      []
     );
 
 
   const setEqualizerBandLevel =
     useCallback(
       async (
-        bandIndex:
+        _bandIndex:
           number,
 
-        levelMb:
+        _levelMb:
           number
       ) => {
-        ExpoAudioEqualizer
-          .hmusicSetEqualizerBandLevel(
-            player.id,
-            bandIndex,
-            levelMb
-          );
-
-        const info =
-          ExpoAudioEqualizer
-            .hmusicGetEqualizerInfo(
-              player.id
-            );
-
-        scheduleEqualizerSave(
-          info
-        );
-
-        return info;
+        return emptyEqualizerInfo();
       },
-      [
-        player.id,
-        scheduleEqualizerSave,
-      ]
+      []
     );
 
 
   const setEqualizerLevels =
     useCallback(
       async (
-        levelsMb:
+        _levelsMb:
           number[]
       ) => {
-        ExpoAudioEqualizer
-          .hmusicSetEqualizerLevels(
-            player.id,
-            levelsMb
-          );
-
-        const info =
-          ExpoAudioEqualizer
-            .hmusicGetEqualizerInfo(
-              player.id
-            );
-
-        scheduleEqualizerSave(
-          info
-        );
-
-        return info;
+        return emptyEqualizerInfo();
       },
-      [
-        player.id,
-        scheduleEqualizerSave,
-      ]
+      []
     );
 
 
   const resetEqualizer =
     useCallback(
       async () => {
-        ExpoAudioEqualizer
-          .hmusicResetEqualizer(
-            player.id
-          );
-
-        const info =
-          ExpoAudioEqualizer
-            .hmusicGetEqualizerInfo(
-              player.id
-            );
-
-        scheduleEqualizerSave(
-          info
-        );
-
-        return info;
+        return emptyEqualizerInfo();
       },
-      [
-        player.id,
-        scheduleEqualizerSave,
-      ]
+      []
     );
-
-
-  useEffect(
-    () => {
-      if (
-        equalizerRestored.current ||
-        !currentSong ||
-        !status.isLoaded
-      ) {
-        return;
-      }
-
-      equalizerRestored.current =
-        true;
-
-      void (
-        async () => {
-          try {
-            const raw =
-              await AsyncStorage
-                .getItem(
-                  EQUALIZER_STATE_KEY
-                );
-
-            if (!raw) {
-              return;
-            }
-
-            const saved =
-              JSON.parse(
-                raw
-              ) as Partial<
-                SavedEqualizerState
-              >;
-
-            if (
-              Array.isArray(
-                saved.levelsMb
-              )
-            ) {
-              const levels =
-                saved.levelsMb
-                  .map(
-                    value =>
-                      Number(
-                        value
-                      )
-                  )
-                  .filter(
-                    value =>
-                      Number.isFinite(
-                        value
-                      )
-                  );
-
-              if (
-                levels.length >
-                0
-              ) {
-                ExpoAudioEqualizer
-                  .hmusicSetEqualizerLevels(
-                    player.id,
-                    levels
-                  );
-              }
-            }
-
-            ExpoAudioEqualizer
-              .hmusicSetEqualizerEnabled(
-                player.id,
-                Boolean(
-                  saved.enabled
-                )
-              );
-          } catch (
-            error
-          ) {
-            console.log(
-              'Ecualizador no restaurado:',
-              error
-            );
-          }
-        }
-      )();
-    },
-    [
-      currentSong?.id,
-      status.isLoaded,
-      player.id,
-    ]
-  );
-
-
-  useEffect(
-    () => {
-      return () => {
-        if (
-          equalizerSaveTimer.current
-        ) {
-          clearTimeout(
-            equalizerSaveTimer.current
-          );
-        }
-      };
-    },
-    []
-  );
-
-
-  /* =========================================================
-     FIN AUTOMÁTICO DE CANCIÓN
-  ========================================================= */
-
-  useEffect(
-    () => {
-      const justFinished =
-        Boolean(
-          status.didJustFinish
-        ) &&
-        !previousFinished
-          .current;
-
-      previousFinished.current =
-        Boolean(
-          status.didJustFinish
-        );
-
-      if (
-        !justFinished ||
-        !currentSong ||
-        activeQueue.length ===
-          0
-      ) {
-        return;
-      }
-
-      if (
-        repeatMode ===
-        'one'
-      ) {
-        void player
-          .seekTo(
-            0
-          )
-          .then(
-            () => {
-              setOptimisticPlaying(
-                true
-              );
-
-              player.play();
-            }
-          );
-
-        return;
-      }
-
-      if (
-        shuffle
-      ) {
-        loadSong(
-          activeQueue[
-            getRandomIndex()
-          ],
-          activeQueue,
-          true
-        );
-
-        return;
-      }
-
-      if (
-        currentIndex >=
-          0 &&
-        currentIndex <
-          activeQueue.length -
-            1
-      ) {
-        loadSong(
-          activeQueue[
-            currentIndex +
-              1
-          ],
-          activeQueue,
-          true
-        );
-
-        return;
-      }
-
-      if (
-        repeatMode ===
-        'all'
-      ) {
-        loadSong(
-          activeQueue[
-            0
-          ],
-          activeQueue,
-          true
-        );
-
-        return;
-      }
-
-      setOptimisticPlaying(
-        false
-      );
-    },
-    [
-      status.didJustFinish,
-      currentSong,
-      activeQueue,
-      repeatMode,
-      shuffle,
-      currentIndex,
-      player,
-      getRandomIndex,
-      loadSong,
-    ]
-  );
 
 
   return {
@@ -2202,15 +1769,14 @@ export function useMusicPlayer(
 
     currentIndex,
 
-    isPlaying:
-      optimisticPlaying,
+    isPlaying,
 
     currentTime:
-      status.currentTime ||
+      progress.position ||
       0,
 
     duration:
-      status.duration ||
+      progress.duration ||
       currentSong?.duration ||
       0,
 

@@ -223,7 +223,7 @@ export function AppProvider({
    * =========================================================
    *
    * useMusicPlayer recibe actualizaciones frecuentes de
-   * expo-audio (por ejemplo currentTime cada ~250 ms).
+   * el reproductor (por ejemplo currentTime cada ~250 ms).
    *
    * Algunas funciones internas pueden recrearse durante esas
    * actualizaciones aunque su comportamiento sea el mismo.
@@ -553,7 +553,7 @@ export function AppProvider({
   /*
    * El temporizador recibe también una función pause estable.
    * Así useSleepTimer no se reconstruye por cambios rápidos
-   * del estado de expo-audio.
+   * del estado del reproductor.
    */
   const rawSleepTimer =
     useSleepTimer(
@@ -936,7 +936,7 @@ export function AppProvider({
   /*
    * El progreso rápido NO viaja por AppContext.
    *
-   * expo-audio actualiza currentTime aproximadamente cada 250 ms.
+   * el reproductor actualiza currentTime aproximadamente... cada 250 ms.
    * Publicamos esos cambios en un store externo para que solamente
    * MiniPlayer / PlayerModal / Lyrics (los consumidores reales del
    * progreso) se actualicen.

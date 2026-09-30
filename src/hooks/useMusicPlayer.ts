@@ -27,6 +27,17 @@ import {
   setupTrackPlayer,
 } from '../services/trackPlayerSetup';
 
+import HmusicEqualizer from '../../modules/hmusic-equalizer';
+
+export type {
+  HmusicEqualizerBand,
+  HmusicEqualizerInfo,
+} from '../../modules/hmusic-equalizer';
+
+import type {
+  HmusicEqualizerInfo,
+} from '../../modules/hmusic-equalizer';
+
 
 const PLAYER_STATE_KEY =
   '@musicplayer/player-state';
@@ -59,68 +70,6 @@ interface SavedPlayerState {
 
   repeatMode:
     RepeatMode;
-}
-
-
-/*
- * Estas interfaces se conservan para no romper los componentes
- * que todavía muestran la interfaz del ecualizador.
- *
- * El ecualizador se conectará después a un módulo nativo separado.
- */
-export interface HmusicEqualizerBand {
-  index:
-    number;
-
-  centerFrequencyHz:
-    number;
-
-  levelMb:
-    number;
-}
-
-
-export interface HmusicEqualizerInfo {
-  supported:
-    boolean;
-
-  enabled:
-    boolean;
-
-  audioSessionId:
-    number;
-
-  minLevelMb:
-    number;
-
-  maxLevelMb:
-    number;
-
-  bands:
-    HmusicEqualizerBand[];
-}
-
-
-function emptyEqualizerInfo(): HmusicEqualizerInfo {
-  return {
-    supported:
-      false,
-
-    enabled:
-      false,
-
-    audioSessionId:
-      0,
-
-    minLevelMb:
-      0,
-
-    maxLevelMb:
-      0,
-
-    bands:
-      [],
-  };
 }
 
 
@@ -1700,14 +1649,17 @@ export function useMusicPlayer(
 
 
   /* =========================================================
-     ECUALIZADOR
-     Se conectará después a un módulo nativo separado.
+     ECUALIZADOR NATIVO
   ========================================================= */
 
   const getEqualizerInfo =
     useCallback(
-      async () => {
-        return emptyEqualizerInfo();
+      async (): Promise<
+        HmusicEqualizerInfo
+      > => {
+
+        return await HmusicEqualizer
+          .getEqualizerInfoAsync();
       },
       []
     );
@@ -1716,10 +1668,16 @@ export function useMusicPlayer(
   const setEqualizerEnabled =
     useCallback(
       async (
-        _enabled:
+        enabled:
           boolean
-      ) => {
-        return emptyEqualizerInfo();
+      ): Promise<
+        HmusicEqualizerInfo
+      > => {
+
+        return await HmusicEqualizer
+          .setEqualizerEnabledAsync(
+            enabled
+          );
       },
       []
     );
@@ -1728,13 +1686,20 @@ export function useMusicPlayer(
   const setEqualizerBandLevel =
     useCallback(
       async (
-        _bandIndex:
+        bandIndex:
           number,
 
-        _levelMb:
+        levelMb:
           number
-      ) => {
-        return emptyEqualizerInfo();
+      ): Promise<
+        HmusicEqualizerInfo
+      > => {
+
+        return await HmusicEqualizer
+          .setEqualizerBandLevelAsync(
+            bandIndex,
+            levelMb
+          );
       },
       []
     );
@@ -1743,10 +1708,16 @@ export function useMusicPlayer(
   const setEqualizerLevels =
     useCallback(
       async (
-        _levelsMb:
+        levelsMb:
           number[]
-      ) => {
-        return emptyEqualizerInfo();
+      ): Promise<
+        HmusicEqualizerInfo
+      > => {
+
+        return await HmusicEqualizer
+          .setEqualizerLevelsAsync(
+            levelsMb
+          );
       },
       []
     );
@@ -1754,8 +1725,12 @@ export function useMusicPlayer(
 
   const resetEqualizer =
     useCallback(
-      async () => {
-        return emptyEqualizerInfo();
+      async (): Promise<
+        HmusicEqualizerInfo
+      > => {
+
+        return await HmusicEqualizer
+          .resetEqualizerAsync();
       },
       []
     );

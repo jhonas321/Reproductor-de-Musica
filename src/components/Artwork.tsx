@@ -11,6 +11,7 @@ import {
 
 import {
   Animated,
+  Image,
   StyleSheet,
   Text,
   View,
@@ -20,41 +21,13 @@ import {
   getArtworkTheme,
 } from '../utils/artworkTheme';
 
-
 interface Props {
-  uri?:
-    string | null;
-
-  size:
-    number;
-
-  radius?:
-    number;
-
-  iconSize?:
-    number;
-
-  seed?:
-    string;
+  uri?: string | null;
+  size: number;
+  radius?: number;
+  iconSize?: number;
+  seed?: string;
 }
-
-
-/* =========================================================
-   ARTWORK
-
-   REGLA IMPORTANTE:
-
-   - Si existe una URI de portada, mostramos directamente
-     la imagen real.
-
-   - Si esa URI falla, recién mostramos la portada Hmusic.
-
-   - Si no existe URI, mostramos Hmusic inmediatamente.
-
-   Guardamos la URI que falló, no un booleano global.
-   De esta manera el error de la canción anterior nunca se
-   arrastra a la siguiente canción.
-========================================================= */
 
 function Artwork({
   uri,
@@ -66,273 +39,159 @@ function Artwork({
   const [
     failedUri,
     setFailedUri,
-  ] =
-    useState<
-      string | null
-    >(
-      null
-    );
-
+  ] = useState<string | null>(
+    null
+  );
 
   const normalizedUri =
-    typeof uri ===
-      'string'
-
+    typeof uri === 'string'
       ? uri.trim()
-
       : '';
 
+  /*
+   * Cuando cambia la URI, olvidamos cualquier error anterior.
+   * Así una canción nueva nunca hereda el fallo de otra.
+   */
+  useEffect(
+    () => {
+      setFailedUri(null);
+    },
+    [
+      normalizedUri,
+    ]
+  );
 
   const imageFailed =
-    normalizedUri.length >
-      0
-    &&
-    failedUri ===
-      normalizedUri;
-
+    normalizedUri.length > 0 &&
+    failedUri === normalizedUri;
 
   const hasRealArtwork =
-    normalizedUri.length >
-      0
-    &&
+    normalizedUri.length > 0 &&
     !imageFailed;
 
-
-  /* =======================================================
-     TRANSICIONES SUAVES
-
-     - Las portadas reales aparecen con fade.
-     - Las portadas Hmusic aparecen con fade + escala suave.
-     - Nunca mostramos Hmusic mientras una portada real
-       simplemente está cargando.
-  ======================================================= */
-
-  const realOpacity =
-    useRef(
-      new Animated.Value(0)
-    ).current;
-
-
+  /*
+   * Solo el fallback Hmusic mantiene animación.
+   * La portada real se pinta directamente para evitar
+   * cuadros negros mientras esperamos onLoad.
+   */
   const fallbackOpacity =
     useRef(
       new Animated.Value(0)
     ).current;
-
 
   const fallbackScale =
     useRef(
       new Animated.Value(0.985)
     ).current;
 
-
   useEffect(
     () => {
-      realOpacity.stopAnimation();
-
       fallbackOpacity.stopAnimation();
-
       fallbackScale.stopAnimation();
 
-
-      realOpacity.setValue(
-        0
-      );
-
-
-      if (
-        hasRealArtwork
-      ) {
-        fallbackOpacity.setValue(
-          0
-        );
-
-        fallbackScale.setValue(
-          0.985
-        );
-
+      if (hasRealArtwork) {
+        fallbackOpacity.setValue(0);
+        fallbackScale.setValue(0.985);
         return;
       }
 
-
-      fallbackOpacity.setValue(
-        0
-      );
-
-      fallbackScale.setValue(
-        0.985
-      );
-
+      fallbackOpacity.setValue(0);
+      fallbackScale.setValue(0.985);
 
       Animated.parallel([
         Animated.timing(
           fallbackOpacity,
           {
-            toValue:
-              1,
-
-            duration:
-              120,
-
-            useNativeDriver:
-              true,
+            toValue: 1,
+            duration: 120,
+            useNativeDriver: true,
           }
         ),
-
         Animated.timing(
           fallbackScale,
           {
-            toValue:
-              1,
-
-            duration:
-              140,
-
-            useNativeDriver:
-              true,
+            toValue: 1,
+            duration: 140,
+            useNativeDriver: true,
           }
         ),
       ]).start();
     },
-
     [
       normalizedUri,
       imageFailed,
       seed,
       hasRealArtwork,
-      realOpacity,
       fallbackOpacity,
       fallbackScale,
     ]
   );
-
-
-  const handleRealArtworkLoad =
-    () => {
-      realOpacity.stopAnimation();
-
-      realOpacity.setValue(
-        0
-      );
-
-
-      Animated.timing(
-        realOpacity,
-        {
-          toValue:
-            1,
-
-          duration:
-            120,
-
-          useNativeDriver:
-            true,
-        }
-      ).start();
-    };
-
 
   const variant =
     getArtworkTheme(
       seed
     );
 
-
   const bigGlowSize =
-    size *
-    0.90;
-
+    size * 0.90;
 
   const smallGlowSize =
-    size *
-    0.72;
-
+    size * 0.72;
 
   const discSize =
     Math.max(
       28,
-
-      size *
-        0.43
+      size * 0.43
     );
 
-
   const showBrand =
-    size >=
-    105;
-
+    size >= 105;
 
   const actualIconSize =
     Math.min(
       iconSize,
-
-      discSize *
-        0.52
+      discSize * 0.52
     );
 
-
-  /* =======================================================
-     PORTADA REAL
-  ======================================================= */
-
-  if (
-    hasRealArtwork
-  ) {
+  /*
+   * PORTADA REAL
+   *
+   * Importante:
+   * - No usamos Animated.Image.
+   * - No usamos opacity 0.
+   * - La imagen se dibuja inmediatamente.
+   * - Si realmente falla, onError activa Hmusic.
+   */
+  if (hasRealArtwork) {
     return (
       <View
         style={[
           styles.wrapper,
-
           {
-            width:
-              size,
-
-            height:
-              size,
-
-            borderRadius:
-              radius,
+            width: size,
+            height: size,
+            borderRadius: radius,
           },
         ]}
       >
-        <Animated.Image
-          key={
-            normalizedUri
-          }
-
+        <Image
+          key={normalizedUri}
           source={{
-            uri:
-              normalizedUri,
+            uri: normalizedUri,
           }}
-
           resizeMode="cover"
-
           fadeDuration={0}
-
-          onLoad={
-            handleRealArtworkLoad
-          }
-
           onError={() => {
             setFailedUri(
               normalizedUri
             );
           }}
-
           style={[
             styles.realArtwork,
-
             {
-              width:
-                size,
-
-              height:
-                size,
-
-              borderRadius:
-                radius,
-
-              opacity:
-                realOpacity,
+              width: size,
+              height: size,
+              borderRadius: radius,
             },
           ]}
         />
@@ -340,36 +199,25 @@ function Artwork({
     );
   }
 
-
-  /* =======================================================
-     PORTADA PREDETERMINADA HMUSIC
-
-     Solo llegamos aquí cuando:
-     - la canción no tiene URI de portada, o
-     - su URI realmente falló al cargar.
-  ======================================================= */
-
+  /*
+   * PORTADA PREDETERMINADA HMUSIC
+   *
+   * Se muestra cuando:
+   * - no existe URI, o
+   * - la portada real falló.
+   */
   return (
     <Animated.View
       style={[
         styles.wrapper,
-
         {
-          width:
-            size,
-
-          height:
-            size,
-
-          borderRadius:
-            radius,
-
+          width: size,
+          height: size,
+          borderRadius: radius,
           backgroundColor:
             variant.background,
-
           opacity:
             fallbackOpacity,
-
           transform: [
             {
               scale:
@@ -379,142 +227,71 @@ function Artwork({
         },
       ]}
     >
-      {/* ===============================================
-          LUZ SUPERIOR
-      =============================================== */}
-
       <View
         style={{
-          position:
-            'absolute',
-
-          width:
-            bigGlowSize,
-
-          height:
-            bigGlowSize,
-
+          position: 'absolute',
+          width: bigGlowSize,
+          height: bigGlowSize,
           borderRadius:
-            bigGlowSize /
-            2,
-
+            bigGlowSize / 2,
           top:
-            -bigGlowSize *
-            0.36,
-
+            -bigGlowSize * 0.36,
           right:
-            -bigGlowSize *
-            0.30,
-
+            -bigGlowSize * 0.30,
           backgroundColor:
             variant.glow1,
-
-          opacity:
-            0.52,
+          opacity: 0.52,
         }}
       />
-
-
-      {/* ===============================================
-          LUZ INFERIOR
-      =============================================== */}
 
       <View
         style={{
-          position:
-            'absolute',
-
-          width:
-            smallGlowSize,
-
-          height:
-            smallGlowSize,
-
+          position: 'absolute',
+          width: smallGlowSize,
+          height: smallGlowSize,
           borderRadius:
-            smallGlowSize /
-            2,
-
+            smallGlowSize / 2,
           bottom:
-            -smallGlowSize *
-            0.34,
-
+            -smallGlowSize * 0.34,
           left:
-            -smallGlowSize *
-            0.28,
-
+            -smallGlowSize * 0.28,
           backgroundColor:
             variant.glow2,
-
-          opacity:
-            0.42,
+          opacity: 0.42,
         }}
       />
-
-
-      {/* ===============================================
-          CÍRCULO DECORATIVO
-      =============================================== */}
 
       <View
         style={[
           styles.decorCircle,
-
           {
             width:
-              size *
-              0.70,
-
+              size * 0.70,
             height:
-              size *
-              0.70,
-
+              size * 0.70,
             borderRadius:
-              size *
-              0.35,
-
+              size * 0.35,
             right:
-              -size *
-              0.22,
-
+              -size * 0.22,
             bottom:
-              -size *
-              0.19,
+              -size * 0.19,
           },
         ]}
       />
-
-
-      {/* ===============================================
-          LÍNEA DECORATIVA
-      =============================================== */}
 
       <View
         style={[
           styles.decorLine,
-
           {
             width:
-              size *
-              0.72,
-
+              size * 0.72,
             right:
-              -size *
-              0.15,
-
+              -size * 0.15,
             top:
-              size *
-              0.23,
+              size * 0.23,
           },
         ]}
       />
-
-
-      {/* ===============================================
-          ICONO CENTRAL
-
-          El icono musical queda exactamente al centro
-          de la portada.
-      =============================================== */}
 
       <View
         style={
@@ -524,61 +301,41 @@ function Artwork({
         <View
           style={[
             styles.disc,
-
             {
               width:
                 discSize,
-
               height:
                 discSize,
-
               borderRadius:
-                discSize /
-                2,
+                discSize / 2,
             },
           ]}
         >
           <View
             style={[
               styles.discRing,
-
               {
                 width:
-                  discSize *
-                  0.72,
-
+                  discSize * 0.72,
                 height:
-                  discSize *
-                  0.72,
-
+                  discSize * 0.72,
                 borderRadius:
-                  discSize *
-                  0.36,
+                  discSize * 0.36,
               },
             ]}
           />
 
-
           <MaterialCommunityIcons
             name="music-note"
-
             size={
               actualIconSize
             }
-
             color={
               variant.icon
             }
           />
         </View>
       </View>
-
-
-      {/* ===============================================
-          TEXTO HMUSIC
-
-          Se mantiene abajo, como estaba antes.
-      =============================================== */}
 
       {showBrand ? (
         <View
@@ -594,7 +351,6 @@ function Artwork({
             Hmusic
           </Text>
 
-
           <Text
             style={
               styles.brandSubtitle
@@ -608,15 +364,9 @@ function Artwork({
   );
 }
 
-
 export default memo(
   Artwork
 );
-
-
-/* =========================================================
-   ESTILOS
-========================================================= */
 
 const styles =
   StyleSheet.create({
@@ -637,7 +387,6 @@ const styles =
         'rgba(255,255,255,0.11)',
     },
 
-
     realArtwork: {
       position:
         'absolute',
@@ -649,7 +398,6 @@ const styles =
         0,
     },
 
-
     decorCircle: {
       position:
         'absolute',
@@ -660,7 +408,6 @@ const styles =
       borderColor:
         'rgba(255,255,255,0.14)',
     },
-
 
     decorLine: {
       position:
@@ -680,7 +427,6 @@ const styles =
       ],
     },
 
-
     disc: {
       backgroundColor:
         'rgba(8,9,16,0.28)',
@@ -698,7 +444,6 @@ const styles =
         'rgba(255,255,255,0.25)',
     },
 
-
     discRing: {
       position:
         'absolute',
@@ -709,7 +454,6 @@ const styles =
       borderColor:
         'rgba(255,255,255,0.13)',
     },
-
 
     centerContent: {
       position:
@@ -734,7 +478,6 @@ const styles =
         'center',
     },
 
-
     brandArea: {
       position:
         'absolute',
@@ -748,7 +491,6 @@ const styles =
       alignItems:
         'flex-start',
     },
-
 
     brand: {
       color:
@@ -766,7 +508,6 @@ const styles =
       textAlign:
         'left',
     },
-
 
     brandSubtitle: {
       color:

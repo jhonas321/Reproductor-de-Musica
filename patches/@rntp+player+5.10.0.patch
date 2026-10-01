@@ -1,0 +1,116 @@
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/checksums.lock b/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/checksums.lock
+new file mode 100644
+index 0000000..f75eaae
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/checksums.lock differ
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/md5-checksums.bin b/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/md5-checksums.bin
+new file mode 100644
+index 0000000..87db10b
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/md5-checksums.bin differ
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/sha1-checksums.bin b/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/sha1-checksums.bin
+new file mode 100644
+index 0000000..bbcc591
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/9.2.0/checksums/sha1-checksums.bin differ
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/fileChanges/last-build.bin b/node_modules/@rntp/player/android/.gradle/9.2.0/fileChanges/last-build.bin
+new file mode 100644
+index 0000000..f76dd23
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/9.2.0/fileChanges/last-build.bin differ
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/fileHashes/fileHashes.bin b/node_modules/@rntp/player/android/.gradle/9.2.0/fileHashes/fileHashes.bin
+new file mode 100644
+index 0000000..e206665
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/9.2.0/fileHashes/fileHashes.bin differ
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/fileHashes/fileHashes.lock b/node_modules/@rntp/player/android/.gradle/9.2.0/fileHashes/fileHashes.lock
+new file mode 100644
+index 0000000..8d12a6c
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/9.2.0/fileHashes/fileHashes.lock differ
+diff --git a/node_modules/@rntp/player/android/.gradle/9.2.0/gc.properties b/node_modules/@rntp/player/android/.gradle/9.2.0/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/@rntp/player/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/@rntp/player/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..ef94cd2
+Binary files /dev/null and b/node_modules/@rntp/player/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/@rntp/player/android/.gradle/buildOutputCleanup/cache.properties b/node_modules/@rntp/player/android/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..d750421
+--- /dev/null
++++ b/node_modules/@rntp/player/android/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Wed Sep 30 09:46:58 BOT 2026
++gradle.version=9.2.0
+diff --git a/node_modules/@rntp/player/android/.gradle/vcs-1/gc.properties b/node_modules/@rntp/player/android/.gradle/vcs-1/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/@rntp/player/android/src/main/java/com/doublesymmetry/trackplayer/TrackPlayerPlaybackService.kt b/node_modules/@rntp/player/android/src/main/java/com/doublesymmetry/trackplayer/TrackPlayerPlaybackService.kt
+index 3f8c710..189780c 100644
+--- a/node_modules/@rntp/player/android/src/main/java/com/doublesymmetry/trackplayer/TrackPlayerPlaybackService.kt
++++ b/node_modules/@rntp/player/android/src/main/java/com/doublesymmetry/trackplayer/TrackPlayerPlaybackService.kt
+@@ -183,6 +183,23 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
+   private var exoPlayer: ExoPlayer? = null
+   internal var castPlayer: CastPlayer? = null
+   internal var activePlayer: Player? = null
++
++  // HMUSIC EQ: comparte con el módulo HmusicEqualizer la sesión real de ExoPlayer.
++  private fun updateHmusicAudioSessionId(audioSessionId: Int) {
++    val preferences = getSharedPreferences(HMUSIC_AUDIO_SESSION_PREFS, MODE_PRIVATE)
++    val editor = preferences.edit()
++
++    if (audioSessionId > 0) {
++      editor.putInt(HMUSIC_AUDIO_SESSION_KEY, audioSessionId)
++      Log.d("TrackPlayer", "[HMUSIC-EQ] Audio session: $audioSessionId")
++    } else {
++      editor.remove(HMUSIC_AUDIO_SESSION_KEY)
++      Log.d("TrackPlayer", "[HMUSIC-EQ] Audio session cleared")
++    }
++
++    editor.apply()
++  }
++
+   private val livePositionGuard = LivePositionGuard()
+   private var progressSyncTimer: java.util.Timer? = null
+   private var progressSyncExecutor: java.util.concurrent.ExecutorService? = null
+@@ -282,6 +299,12 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
+       .build()
+     exoPlayer = built
+ 
++    // HMUSIC EQ: normalmente la sesión todavía se crea al empezar a reproducir,
++    // pero si Media3 ya dispone de una sesión válida la guardamos de inmediato.
++    if (built.audioSessionId > 0) {
++      updateHmusicAudioSessionId(built.audioSessionId)
++    }
++
+     if (config.preloadWindow > 0 && config.cacheMaxSizeBytes != null) {
+       built.preloadConfiguration = ExoPlayer.PreloadConfiguration(
+         /* targetPreloadDurationUs= */ Long.MAX_VALUE  // Full file for auto preloading
+@@ -328,6 +351,13 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
+     controller.onStateChanged = { persistSleepTimerState() }
+ 
+     activePlayer.addListener(object : Player.Listener {
++      // HMUSIC EQ: Media3 avisa cuando la salida de audio obtiene o cambia de sesión.
++      // Guardamos ese ID para que HmusicEqualizer pueda adjuntar Equalizer a esta
++      // sesión concreta, en lugar de utilizar la sesión global 0.
++      override fun onAudioSessionIdChanged(audioSessionId: Int) {
++        updateHmusicAudioSessionId(audioSessionId)
++      }
++
+       override fun onIsPlayingChanged(isPlaying: Boolean) {
+         if (isPlaying) startProgressSyncTimer() else stopProgressSyncTimer(fireFinalTick = true)
+         this@TrackPlayerPlaybackService.emitEvent(IsPlayingChangedEvent(isPlaying))
+@@ -602,6 +632,9 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
+   }
+ 
+   override fun onDestroy() {
++    // Evita que HmusicEqualizer reutilice un ID perteneciente a una sesión ya destruida.
++    updateHmusicAudioSessionId(0)
++
+     if (BrowseTreeRepository.onCommitted === onBrowseTreeCommitted) {
+       BrowseTreeRepository.onCommitted = null
+     }
+@@ -1261,6 +1294,8 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
+   // endregion
+ 
+   companion object {
++    private const val HMUSIC_AUDIO_SESSION_PREFS = "hmusic_audio_session"
++    private const val HMUSIC_AUDIO_SESSION_KEY = "audio_session_id"
+     private const val ACTION_START_PLAYBACK = "com.doublesymmetry.trackplayer.START_PLAYBACK"
+     internal const val BROWSE_REFRESH_MIN_INTERVAL_MS = 15_000L
+     internal var browseRefreshClock: () -> Long = SystemClock::elapsedRealtime

@@ -11,12 +11,16 @@
     "icon": "./assets/images/icono.png",
 
     "android": {
-      "package": "com.musicplayer.mimusica"
+      "package": "com.musicplayer.mimusica",
+      "permissions": [
+        "MODIFY_AUDIO_SETTINGS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
 
     "plugins": [
       "expo-router",
-
       [
         "expo-media-library",
         {

@@ -1,13 +1,6 @@
-import {
-  MaterialCommunityIcons,
-} from '@expo/vector-icons';
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useState } from "react";
 
 import {
   Image,
@@ -19,35 +12,22 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from "react-native";
 
-import {
-  SafeAreaView,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import {
-  COLORS,
-} from '../constants/colors';
+import { COLORS } from "../constants/colors";
 
-import {
-  useApp,
-  usePlayerProgress,
-} from '../context/AppContext';
+import { useApp, usePlayerProgress } from "../context/AppContext";
 
-import {
-  getArtworkTheme,
-} from '../utils/artworkTheme';
+import { getArtworkTheme } from "../utils/artworkTheme";
 
-import type {
-  RepeatMode,
-  Song,
-} from '../types/Song';
+import type { RepeatMode, Song } from "../types/Song";
 
-import Artwork from './Artwork';
-import EqualizerModal from './EqualizerModal';
-import LyricsModal from './LyricsModal';
-import ProgressBar from './ProgressBar';
-
+import Artwork from "./Artwork";
+import EqualizerModal from "./EqualizerModal";
+import LyricsModal from "./LyricsModal";
+import ProgressBar from "./ProgressBar";
 
 interface Props {
   visible: boolean;
@@ -76,33 +56,24 @@ interface Props {
 
   onFavorite: () => void;
 
-  onSeek: (
-    seconds: number
-  ) => void;
+  onSeek: (seconds: number) => void;
 
   onQueue: () => void;
 
   onSleepTimer: () => void;
 }
 
-
 interface FooterActionProps {
-  icon:
-    keyof typeof MaterialCommunityIcons.glyphMap;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
 
-  label:
-    string;
+  label: string;
 
-  active?:
-    boolean;
+  active?: boolean;
 
-  compact?:
-    boolean;
+  compact?: boolean;
 
-  onPress:
-    () => void;
+  onPress: () => void;
 }
-
 
 function FooterAction({
   icon,
@@ -116,37 +87,20 @@ function FooterAction({
       style={[
         styles.footerAction,
 
-        compact &&
-          styles.footerActionCompact,
+        compact && styles.footerActionCompact,
 
-        active &&
-          styles.footerActionActive,
+        active && styles.footerActionActive,
       ]}
       activeOpacity={0.72}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <View
-        style={[
-          styles.footerIcon,
-
-          compact &&
-            styles.footerIconCompact,
-        ]}
-      >
+      <View style={[styles.footerIcon, compact && styles.footerIconCompact]}>
         <MaterialCommunityIcons
           name={icon}
-          size={
-            compact
-              ? 19
-              : 22
-          }
-          color={
-            active
-              ? COLORS.purpleLight
-              : COLORS.white
-          }
+          size={compact ? 19 : 22}
+          color={active ? COLORS.purpleLight : COLORS.white}
         />
       </View>
 
@@ -154,11 +108,9 @@ function FooterAction({
         style={[
           styles.footerText,
 
-          compact &&
-            styles.footerTextCompact,
+          compact && styles.footerTextCompact,
 
-          active &&
-            styles.footerTextActive,
+          active && styles.footerTextActive,
         ]}
         numberOfLines={1}
       >
@@ -168,86 +120,46 @@ function FooterAction({
   );
 }
 
-
 interface PlayerProgressConnectedProps {
-  onSeek:
-    (
-      seconds:
-        number
-    ) => void;
+  onSeek: (seconds: number) => void;
 }
 
-
-function PlayerProgressConnected({
-  onSeek,
-}: PlayerProgressConnectedProps) {
-  const {
-    currentTime,
-    duration,
-  } =
-    usePlayerProgress();
+function PlayerProgressConnected({ onSeek }: PlayerProgressConnectedProps) {
+  const { currentTime, duration } = usePlayerProgress();
 
   return (
     <ProgressBar
-      currentTime={
-        currentTime
-      }
-
-      duration={
-        duration
-      }
-
-      onSeek={
-        onSeek
-      }
+      currentTime={currentTime}
+      duration={duration}
+      onSeek={onSeek}
     />
   );
 }
 
-
 interface LyricsModalConnectedProps {
-  visible:
-    boolean;
+  visible: boolean;
 
-  song:
-    Song;
+  song: Song;
 
-  onClose:
-    () => void;
+  onClose: () => void;
 }
-
 
 function LyricsModalConnected({
   visible,
   song,
   onClose,
 }: LyricsModalConnectedProps) {
-  const {
-    currentTime,
-  } =
-    usePlayerProgress();
+  const { currentTime } = usePlayerProgress();
 
   return (
     <LyricsModal
-      visible={
-        visible
-      }
-
-      song={
-        song
-      }
-
-      currentTime={
-        currentTime
-      }
-
-      onClose={
-        onClose
-      }
+      visible={visible}
+      song={song}
+      currentTime={currentTime}
+      onClose={onClose}
     />
   );
 }
-
 
 function PlayerModal({
   visible,
@@ -267,36 +179,13 @@ function PlayerModal({
   onQueue,
   onSleepTimer,
 }: Props) {
-  const {
-    width,
-    height,
-  } =
-    useWindowDimensions();
+  const { width, height } = useWindowDimensions();
 
+  const { playlists } = useApp();
 
-  const {
-    playlists,
-  } =
-    useApp();
+  const [playlistOpen, setPlaylistOpen] = useState(false);
 
-
-  const [
-    playlistOpen,
-    setPlaylistOpen,
-  ] =
-    useState(
-      false
-    );
-
-
-  const [
-    equalizerOpen,
-    setEqualizerOpen,
-  ] =
-    useState(
-      false
-    );
-
+  const [equalizerOpen, setEqualizerOpen] = useState(false);
 
   /*
    * =====================================================
@@ -312,18 +201,13 @@ function PlayerModal({
    * 3. Pantalla grande
    */
 
-  const veryNarrow =
-    width < 360;
+  const veryNarrow = width < 360;
 
-  const narrow =
-    width < 390;
+  const narrow = width < 390;
 
-  const shortScreen =
-    height < 760;
+  const shortScreen = height < 760;
 
-  const veryShortScreen =
-    height < 680;
-
+  const veryShortScreen = height < 680;
 
   /*
    * La portada depende tanto del ancho como
@@ -333,137 +217,59 @@ function PlayerModal({
    * la portada empuje los controles fuera.
    */
 
-  const horizontalSpace =
-    veryNarrow
-      ? 22
-      : narrow
-        ? 26
-        : 30;
+  const horizontalSpace = veryNarrow ? 22 : narrow ? 26 : 30;
 
+  const artworkByWidth = width - horizontalSpace;
 
-  const artworkByWidth =
-    width -
-    horizontalSpace;
+  const artworkHeightRatio = veryShortScreen
+    ? 0.325
+    : shortScreen
+    ? 0.37
+    : 0.41;
 
+  const artworkByHeight = height * artworkHeightRatio;
 
-  const artworkHeightRatio =
-    veryShortScreen
-      ? 0.325
-      : shortScreen
-        ? 0.37
-        : 0.41;
+  const artworkSize = Math.max(
+    210,
 
+    Math.min(artworkByWidth, artworkByHeight, 390)
+  );
 
-  const artworkByHeight =
-    height *
-    artworkHeightRatio;
+  const artworkRadius = narrow ? 24 : 28;
 
-
-  const artworkSize =
-    Math.max(
-      210,
-
-      Math.min(
-        artworkByWidth,
-        artworkByHeight,
-        390
-      )
-    );
-
-
-  const artworkRadius =
-    narrow
-      ? 24
-      : 28;
-
-
-  const artworkIconSize =
-    Math.round(
-      artworkSize *
-      0.30
-    );
-
+  const artworkIconSize = Math.round(artworkSize * 0.3);
 
   /*
    * Tamaños de botones.
    */
 
-  const playButtonSize =
-    veryNarrow
-      ? 62
-      : shortScreen
-        ? 66
-        : 70;
+  const playButtonSize = veryNarrow ? 62 : shortScreen ? 66 : 70;
 
+  const playIconSize = veryNarrow ? 38 : 42;
 
-  const playIconSize =
-    veryNarrow
-      ? 38
-      : 42;
+  const secondaryButtonSize = narrow ? 42 : 45;
 
-
-  const secondaryButtonSize =
-    narrow
-      ? 42
-      : 45;
-
-
-  const skipIconSize =
-    narrow
-      ? 34
-      : 38;
-
+  const skipIconSize = narrow ? 34 : 38;
 
   /*
    * Textos.
    */
 
-  const titleFontSize =
-    veryNarrow
-      ? 19
-      : narrow
-        ? 20
-        : 22;
+  const titleFontSize = veryNarrow ? 19 : narrow ? 20 : 22;
 
+  const titleLineHeight = titleFontSize + 5;
 
-  const titleLineHeight =
-    titleFontSize +
-    5;
+  const compactFooter = shortScreen || veryNarrow;
 
+  const [lyricsOpen, setLyricsOpen] = useState(false);
 
-  const compactFooter =
-    shortScreen ||
-    veryNarrow;
+  useEffect(() => {
+    setLyricsOpen(false);
 
+    setPlaylistOpen(false);
 
-  const [
-    lyricsOpen,
-    setLyricsOpen,
-  ] =
-    useState(
-      false
-    );
-
-
-  useEffect(
-    () => {
-      setLyricsOpen(
-        false
-      );
-
-      setPlaylistOpen(
-        false
-      );
-
-      setEqualizerOpen(
-        false
-      );
-    },
-    [
-      song.id,
-    ]
-  );
-
+    setEqualizerOpen(false);
+  }, [song.id]);
 
   /*
    * =====================================================
@@ -471,88 +277,37 @@ function PlayerModal({
    * =====================================================
    */
 
-  const [
-    failedBackgroundUri,
-    setFailedBackgroundUri,
-  ] =
-    useState<
-      string | null
-    >(
-      null
-    );
-
+  const [failedBackgroundUri, setFailedBackgroundUri] = useState<string | null>(
+    null
+  );
 
   const normalizedArtwork =
-    typeof song.artwork ===
-      'string'
-
-      ? song.artwork.trim()
-
-      : '';
-
+    typeof song.artwork === "string" ? song.artwork.trim() : "";
 
   const backgroundArtworkFailed =
-    normalizedArtwork.length >
-      0
-    &&
-    failedBackgroundUri ===
-      normalizedArtwork;
-
+    normalizedArtwork.length > 0 && failedBackgroundUri === normalizedArtwork;
 
   const hasRealBackground =
-    normalizedArtwork.length >
-      0
-    &&
-    !backgroundArtworkFailed;
+    normalizedArtwork.length > 0 && !backgroundArtworkFailed;
 
+  const artworkTheme = getArtworkTheme(song.id);
 
-  const artworkTheme =
-    getArtworkTheme(
-      song.id
-    );
+  const handleClose = useCallback(() => {
+    setLyricsOpen(false);
 
+    setPlaylistOpen(false);
 
-  const handleClose =
-    useCallback(
-      () => {
-        setLyricsOpen(
-          false
-        );
+    setEqualizerOpen(false);
 
-        setPlaylistOpen(
-          false
-        );
+    onClose();
+  }, [onClose]);
 
-        setEqualizerOpen(
-          false
-        );
-
-        onClose();
-      },
-      [
-        onClose,
-      ]
-    );
-
-
-  const addCurrentSongToPlaylist =
-    useCallback(
-      (
-        playlistId:
-          string
-      ) => {
-        playlists
-          .addSong(
-            playlistId,
-            song.id
-          );
-      },
-      [
-        playlists,
-        song.id,
-      ]
-    );
-
+  const addCurrentSongToPlaylist = useCallback(
+    (playlistId: string) => {
+      playlists.addSong(playlistId, song.id);
+    },
+    [playlists, song.id]
+  );
 
   return (
     <>
@@ -562,9 +317,7 @@ function PlayerModal({
         presentationStyle="fullScreen"
         onRequestClose={handleClose}
       >
-        <View
-          style={styles.container}
-        >
+        <View style={styles.container}>
           {/* =========================
               FONDO
           ========================= */}
@@ -576,8 +329,7 @@ function PlayerModal({
                   styles.generatedBackground,
 
                   {
-                    backgroundColor:
-                      artworkTheme.background,
+                    backgroundColor: artworkTheme.background,
                   },
                 ]}
               />
@@ -587,8 +339,7 @@ function PlayerModal({
                   styles.generatedGlowOne,
 
                   {
-                    backgroundColor:
-                      artworkTheme.glow1,
+                    backgroundColor: artworkTheme.glow1,
                   },
                 ]}
               />
@@ -598,8 +349,7 @@ function PlayerModal({
                   styles.generatedGlowTwo,
 
                   {
-                    backgroundColor:
-                      artworkTheme.glow2,
+                    backgroundColor: artworkTheme.glow2,
                   },
                 ]}
               />
@@ -609,50 +359,30 @@ function PlayerModal({
                   styles.generatedGlowThree,
 
                   {
-                    backgroundColor:
-                      artworkTheme.glow1,
+                    backgroundColor: artworkTheme.glow1,
                   },
                 ]}
               />
             </>
           ) : (
-            <View
-              style={
-                styles.neutralBackground
-              }
-            />
+            <View style={styles.neutralBackground} />
           )}
-
 
           {hasRealBackground ? (
             <Image
-              key={
-                normalizedArtwork
-              }
-
+              key={normalizedArtwork}
               source={{
-                uri:
-                  normalizedArtwork,
+                uri: normalizedArtwork,
               }}
-
               blurRadius={45}
-
               resizeMode="cover"
-
               fadeDuration={0}
-
               onError={() => {
-                setFailedBackgroundUri(
-                  normalizedArtwork
-                );
+                setFailedBackgroundUri(normalizedArtwork);
               }}
-
-              style={
-                styles.backgroundImage
-              }
+              style={styles.backgroundImage}
             />
           ) : null}
-
 
           <View
             style={[
@@ -664,16 +394,12 @@ function PlayerModal({
             ]}
           />
 
-
           <SafeAreaView
             style={[
               styles.safeArea,
 
               {
-                paddingHorizontal:
-                  veryNarrow
-                    ? 10
-                    : 16,
+                paddingHorizontal: veryNarrow ? 10 : 16,
               },
             ]}
           >
@@ -686,44 +412,26 @@ function PlayerModal({
                 styles.topBar,
 
                 {
-                  height:
-                    shortScreen
-                      ? 54
-                      : 58,
+                  height: shortScreen ? 54 : 58,
                 },
               ]}
             >
               <TouchableOpacity
-                style={[
-                  styles.topButton,
-
-                  narrow &&
-                    styles.topButtonCompact,
-                ]}
-                activeOpacity={0.70}
+                style={[styles.topButton, narrow && styles.topButtonCompact]}
+                activeOpacity={0.7}
                 onPress={handleClose}
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar reproductor"
               >
                 <MaterialCommunityIcons
                   name="chevron-down"
-                  size={
-                    narrow
-                      ? 27
-                      : 30
-                  }
+                  size={narrow ? 27 : 30}
                   color={COLORS.white}
                 />
               </TouchableOpacity>
 
-
-              <View
-                style={styles.topCenter}
-              >
-                <Text
-                  style={styles.nowPlayingLabel}
-                  numberOfLines={1}
-                >
+              <View style={styles.topCenter}>
+                <Text style={styles.nowPlayingLabel} numberOfLines={1}>
                   REPRODUCIENDO
                 </Text>
 
@@ -732,11 +440,7 @@ function PlayerModal({
                     styles.nowPlayingArtist,
 
                     {
-                      maxWidth:
-                        Math.max(
-                          130,
-                          width - 150
-                        ),
+                      maxWidth: Math.max(130, width - 150),
                     },
                   ]}
                   numberOfLines={1}
@@ -746,46 +450,28 @@ function PlayerModal({
                 </Text>
               </View>
 
-
               <TouchableOpacity
                 style={[
                   styles.topButton,
 
-                  narrow &&
-                    styles.topButtonCompact,
+                  narrow && styles.topButtonCompact,
 
-                  favorite &&
-                    styles.favoriteButtonActive,
+                  favorite && styles.favoriteButtonActive,
                 ]}
-                activeOpacity={0.70}
+                activeOpacity={0.7}
                 onPress={onFavorite}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  favorite
-                    ? 'Quitar de favoritos'
-                    : 'Añadir a favoritos'
+                  favorite ? "Quitar de favoritos" : "Añadir a favoritos"
                 }
               >
                 <MaterialCommunityIcons
-                  name={
-                    favorite
-                      ? 'heart'
-                      : 'heart-outline'
-                  }
-                  size={
-                    narrow
-                      ? 22
-                      : 24
-                  }
-                  color={
-                    favorite
-                      ? COLORS.pink
-                      : COLORS.white
-                  }
+                  name={favorite ? "heart" : "heart-outline"}
+                  size={narrow ? 22 : 24}
+                  color={favorite ? COLORS.pink : COLORS.white}
                 />
               </TouchableOpacity>
             </View>
-
 
             {/* =========================
                 CONTENIDO PRINCIPAL
@@ -796,12 +482,7 @@ function PlayerModal({
                 styles.mainContent,
 
                 {
-                  paddingTop:
-                    veryShortScreen
-                      ? 2
-                      : shortScreen
-                        ? 4
-                        : 7,
+                  paddingTop: veryShortScreen ? 2 : shortScreen ? 4 : 7,
                 },
               ]}
             >
@@ -814,15 +495,9 @@ function PlayerModal({
                   styles.artworkStage,
 
                   {
-                    height:
-                      artworkSize,
+                    height: artworkSize,
 
-                    marginBottom:
-                      veryShortScreen
-                        ? 8
-                        : shortScreen
-                          ? 10
-                          : 14,
+                    marginBottom: veryShortScreen ? 8 : shortScreen ? 10 : 14,
                   },
                 ]}
               >
@@ -831,14 +506,11 @@ function PlayerModal({
                     styles.artworkShell,
 
                     {
-                      width:
-                        artworkSize,
+                      width: artworkSize,
 
-                      height:
-                        artworkSize,
+                      height: artworkSize,
 
-                      borderRadius:
-                        artworkRadius,
+                      borderRadius: artworkRadius,
                     },
                   ]}
                 >
@@ -853,7 +525,6 @@ function PlayerModal({
                 </View>
               </View>
 
-
               {/* =======================
                   INFORMACIÓN
               ======================= */}
@@ -863,15 +534,9 @@ function PlayerModal({
                   styles.songInfo,
 
                   {
-                    paddingHorizontal:
-                      narrow
-                        ? 8
-                        : 12,
+                    paddingHorizontal: narrow ? 8 : 12,
 
-                    minHeight:
-                      shortScreen
-                        ? 68
-                        : 74,
+                    minHeight: shortScreen ? 68 : 74,
                   },
                 ]}
               >
@@ -880,11 +545,9 @@ function PlayerModal({
                     styles.title,
 
                     {
-                      fontSize:
-                        titleFontSize,
+                      fontSize: titleFontSize,
 
-                      lineHeight:
-                        titleLineHeight,
+                      lineHeight: titleLineHeight,
                     },
                   ]}
                   numberOfLines={2}
@@ -893,21 +556,14 @@ function PlayerModal({
                   {song.title}
                 </Text>
 
-
                 <Text
                   style={[
                     styles.artist,
 
                     {
-                      fontSize:
-                        narrow
-                          ? 12
-                          : 13,
+                      fontSize: narrow ? 12 : 13,
 
-                      marginTop:
-                        shortScreen
-                          ? 4
-                          : 6,
+                      marginTop: shortScreen ? 4 : 6,
                     },
                   ]}
                   numberOfLines={1}
@@ -916,16 +572,12 @@ function PlayerModal({
                   {song.artist}
                 </Text>
 
-
                 <View
                   style={[
                     styles.albumRow,
 
                     {
-                      marginTop:
-                        shortScreen
-                          ? 2
-                          : 4,
+                      marginTop: shortScreen ? 2 : 4,
                     },
                   ]}
                 >
@@ -945,7 +597,6 @@ function PlayerModal({
                 </View>
               </View>
 
-
               {/* =======================
                   PROGRESO
               ======================= */}
@@ -955,27 +606,14 @@ function PlayerModal({
                   styles.progressArea,
 
                   {
-                    marginHorizontal:
-                      narrow
-                        ? 8
-                        : 12,
+                    marginHorizontal: narrow ? 8 : 12,
 
-                    marginTop:
-                      veryShortScreen
-                        ? 3
-                        : shortScreen
-                          ? 5
-                          : 7,
+                    marginTop: veryShortScreen ? 3 : shortScreen ? 5 : 7,
                   },
                 ]}
               >
-                <PlayerProgressConnected
-                  onSeek={
-                    onSeek
-                  }
-                />
+                <PlayerProgressConnected onSeek={onSeek} />
               </View>
-
 
               {/* =======================
                   CONTROLES
@@ -986,22 +624,11 @@ function PlayerModal({
                   styles.controls,
 
                   {
-                    height:
-                      shortScreen
-                        ? 64
-                        : 70,
+                    height: shortScreen ? 64 : 70,
 
-                    marginHorizontal:
-                      narrow
-                        ? 4
-                        : 10,
+                    marginHorizontal: narrow ? 4 : 10,
 
-                    marginTop:
-                      veryShortScreen
-                        ? 2
-                        : shortScreen
-                          ? 4
-                          : 6,
+                    marginTop: veryShortScreen ? 2 : shortScreen ? 4 : 6,
                   },
                 ]}
               >
@@ -1010,65 +637,41 @@ function PlayerModal({
                     styles.secondaryControl,
 
                     {
-                      width:
-                        secondaryButtonSize,
+                      width: secondaryButtonSize,
 
-                      height:
-                        secondaryButtonSize,
+                      height: secondaryButtonSize,
 
-                      borderRadius:
-                        secondaryButtonSize /
-                        2,
+                      borderRadius: secondaryButtonSize / 2,
                     },
 
-                    shuffle &&
-                      styles.secondaryControlActive,
+                    shuffle && styles.secondaryControlActive,
                   ]}
-                  activeOpacity={0.70}
+                  activeOpacity={0.7}
                   onPress={onShuffle}
                   accessibilityRole="button"
                   accessibilityLabel={
                     shuffle
-                      ? 'Desactivar reproducción aleatoria'
-                      : 'Activar reproducción aleatoria'
+                      ? "Desactivar reproducción aleatoria"
+                      : "Activar reproducción aleatoria"
                   }
                 >
                   <MaterialCommunityIcons
                     name="shuffle-variant"
-                    size={
-                      narrow
-                        ? 21
-                        : 23
-                    }
-                    color={
-                      shuffle
-                        ? COLORS.purpleLight
-                        : '#DADAE0'
-                    }
+                    size={narrow ? 21 : 23}
+                    color={shuffle ? COLORS.purpleLight : "#DADAE0"}
                   />
 
-                  {shuffle ? (
-                    <View
-                      style={styles.activeDot}
-                    />
-                  ) : null}
+                  {shuffle ? <View style={styles.activeDot} /> : null}
                 </TouchableOpacity>
-
 
                 <TouchableOpacity
                   style={[
                     styles.skipButton,
 
                     {
-                      width:
-                        narrow
-                          ? 48
-                          : 54,
+                      width: narrow ? 48 : 54,
 
-                      height:
-                        narrow
-                          ? 52
-                          : 56,
+                      height: narrow ? 52 : 56,
                     },
                   ]}
                   activeOpacity={0.68}
@@ -1078,67 +681,43 @@ function PlayerModal({
                 >
                   <MaterialCommunityIcons
                     name="skip-previous"
-                    size={
-                      skipIconSize
-                    }
+                    size={skipIconSize}
                     color={COLORS.white}
                   />
                 </TouchableOpacity>
-
 
                 <TouchableOpacity
                   style={[
                     styles.playButton,
 
                     {
-                      width:
-                        playButtonSize,
+                      width: playButtonSize,
 
-                      height:
-                        playButtonSize,
+                      height: playButtonSize,
 
-                      borderRadius:
-                        playButtonSize /
-                        2,
+                      borderRadius: playButtonSize / 2,
                     },
                   ]}
                   activeOpacity={0.82}
                   onPress={onPlayPause}
                   accessibilityRole="button"
-                  accessibilityLabel={
-                    playing
-                      ? 'Pausar'
-                      : 'Reproducir'
-                  }
+                  accessibilityLabel={playing ? "Pausar" : "Reproducir"}
                 >
                   <MaterialCommunityIcons
-                    name={
-                      playing
-                        ? 'pause'
-                        : 'play'
-                    }
-                    size={
-                      playIconSize
-                    }
+                    name={playing ? "pause" : "play"}
+                    size={playIconSize}
                     color={COLORS.white}
                   />
                 </TouchableOpacity>
-
 
                 <TouchableOpacity
                   style={[
                     styles.skipButton,
 
                     {
-                      width:
-                        narrow
-                          ? 48
-                          : 54,
+                      width: narrow ? 48 : 54,
 
-                      height:
-                        narrow
-                          ? 52
-                          : 56,
+                      height: narrow ? 52 : 56,
                     },
                   ]}
                   activeOpacity={0.68}
@@ -1148,71 +727,50 @@ function PlayerModal({
                 >
                   <MaterialCommunityIcons
                     name="skip-next"
-                    size={
-                      skipIconSize
-                    }
+                    size={skipIconSize}
                     color={COLORS.white}
                   />
                 </TouchableOpacity>
-
 
                 <TouchableOpacity
                   style={[
                     styles.secondaryControl,
 
                     {
-                      width:
-                        secondaryButtonSize,
+                      width: secondaryButtonSize,
 
-                      height:
-                        secondaryButtonSize,
+                      height: secondaryButtonSize,
 
-                      borderRadius:
-                        secondaryButtonSize /
-                        2,
+                      borderRadius: secondaryButtonSize / 2,
                     },
 
-                    repeatMode !== 'off' &&
-                      styles.secondaryControlActive,
+                    repeatMode !== "off" && styles.secondaryControlActive,
                   ]}
-                  activeOpacity={0.70}
+                  activeOpacity={0.7}
                   onPress={onRepeat}
                   accessibilityRole="button"
                   accessibilityLabel={
-                    repeatMode === 'off'
-                      ? 'Activar repetición'
-                      : repeatMode === 'all'
-                        ? 'Repetir una canción'
-                        : 'Desactivar repetición'
+                    repeatMode === "off"
+                      ? "Activar repetición"
+                      : repeatMode === "all"
+                      ? "Repetir una canción"
+                      : "Desactivar repetición"
                   }
                 >
                   <MaterialCommunityIcons
-                    name={
-                      repeatMode === 'one'
-                        ? 'repeat-once'
-                        : 'repeat'
-                    }
-                    size={
-                      narrow
-                        ? 21
-                        : 23
-                    }
+                    name={repeatMode === "one" ? "repeat-once" : "repeat"}
+                    size={narrow ? 21 : 23}
                     color={
-                      repeatMode === 'off'
-                        ? '#DADAE0'
-                        : COLORS.purpleLight
+                      repeatMode === "off" ? "#DADAE0" : COLORS.purpleLight
                     }
                   />
 
-                  {repeatMode !== 'off' ? (
-                    <View
-                      style={styles.activeDot}
-                    />
+                  {repeatMode !== "off" ? (
+                    <View style={styles.activeDot} />
                   ) : null}
                 </TouchableOpacity>
               </View>
             </View>
-
 
             {/* =========================
                 FOOTER
@@ -1223,25 +781,13 @@ function PlayerModal({
                 styles.footer,
 
                 {
-                  gap:
-                    veryNarrow
-                      ? 6
-                      : 9,
+                  gap: veryNarrow ? 6 : 9,
 
-                  paddingHorizontal:
-                    veryNarrow
-                      ? 4
-                      : 10,
+                  paddingHorizontal: veryNarrow ? 4 : 10,
 
-                  paddingTop:
-                    shortScreen
-                      ? 2
-                      : 4,
+                  paddingTop: shortScreen ? 2 : 4,
 
-                  paddingBottom:
-                    shortScreen
-                      ? 5
-                      : 7,
+                  paddingBottom: shortScreen ? 5 : 7,
                 },
               ]}
             >
@@ -1256,34 +802,21 @@ function PlayerModal({
                 icon="playlist-plus"
                 label="Playlist"
                 compact={compactFooter}
-                onPress={() =>
-                  setPlaylistOpen(
-                    true
-                  )
-                }
+                onPress={() => setPlaylistOpen(true)}
               />
 
               <FooterAction
                 icon="equalizer"
                 label="EQ"
                 compact={compactFooter}
-                onPress={() =>
-                  setEqualizerOpen(
-                    true
-                  )
-                }
+                onPress={() => setEqualizerOpen(true)}
               />
 
               <FooterAction
                 icon="text-box-outline"
                 label="Letras"
                 compact={compactFooter}
-                active
-                onPress={() =>
-                  setLyricsOpen(
-                    true
-                  )
-                }
+                onPress={() => setLyricsOpen(true)}
               />
 
               <FooterAction
@@ -1294,77 +827,35 @@ function PlayerModal({
               />
             </View>
 
-
             {/* =========================
                 AGREGAR A PLAYLIST
             ========================= */}
 
             {playlistOpen ? (
-              <View
-                style={
-                  styles.playlistOverlay
-                }
-              >
+              <View style={styles.playlistOverlay}>
                 <Pressable
-                  style={
-                    styles.playlistBackdrop
-                  }
-                  onPress={() =>
-                    setPlaylistOpen(
-                      false
-                    )
-                  }
+                  style={styles.playlistBackdrop}
+                  onPress={() => setPlaylistOpen(false)}
                 />
 
-                <View
-                  style={
-                    styles.playlistSheet
-                  }
-                >
-                  <View
-                    style={
-                      styles.playlistHandle
-                    }
-                  />
+                <View style={styles.playlistSheet}>
+                  <View style={styles.playlistHandle} />
 
-                  <View
-                    style={
-                      styles.playlistHeader
-                    }
-                  >
-                    <View
-                      style={
-                        styles.playlistHeaderText
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.playlistTitle
-                        }
-                      >
+                  <View style={styles.playlistHeader}>
+                    <View style={styles.playlistHeaderText}>
+                      <Text style={styles.playlistTitle}>
                         Agregar a playlist
                       </Text>
 
-                      <Text
-                        style={
-                          styles.playlistSubtitle
-                        }
-                        numberOfLines={1}
-                      >
+                      <Text style={styles.playlistSubtitle} numberOfLines={1}>
                         {song.title}
                       </Text>
                     </View>
 
                     <TouchableOpacity
-                      style={
-                        styles.playlistClose
-                      }
+                      style={styles.playlistClose}
                       activeOpacity={0.72}
-                      onPress={() =>
-                        setPlaylistOpen(
-                          false
-                        )
-                      }
+                      onPress={() => setPlaylistOpen(false)}
                     >
                       <MaterialCommunityIcons
                         name="close"
@@ -1374,144 +865,87 @@ function PlayerModal({
                     </TouchableOpacity>
                   </View>
 
-
-                  {playlists
-                    .playlists
-                    .length === 0 ? (
-                    <View
-                      style={
-                        styles.playlistEmpty
-                      }
-                    >
+                  {playlists.playlists.length === 0 ? (
+                    <View style={styles.playlistEmpty}>
                       <MaterialCommunityIcons
                         name="playlist-music-outline"
                         size={42}
                         color="#A7A7B2"
                       />
 
-                      <Text
-                        style={
-                          styles.playlistEmptyTitle
-                        }
-                      >
+                      <Text style={styles.playlistEmptyTitle}>
                         No tienes playlists
                       </Text>
 
-                      <Text
-                        style={
-                          styles.playlistEmptyText
-                        }
-                      >
-                        Crea una desde la sección Playlists y luego podrás agregar esta canción aquí.
+                      <Text style={styles.playlistEmptyText}>
+                        Crea una desde la sección Playlists y luego podrás
+                        agregar esta canción aquí.
                       </Text>
                     </View>
                   ) : (
                     <ScrollView
-                      style={
-                        styles.playlistList
-                      }
-                      contentContainerStyle={
-                        styles.playlistListContent
-                      }
-                      showsVerticalScrollIndicator={
-                        false
-                      }
+                      style={styles.playlistList}
+                      contentContainerStyle={styles.playlistListContent}
+                      showsVerticalScrollIndicator={false}
                     >
-                      {playlists
-                        .playlists
-                        .map(
-                          playlist => {
-                            const alreadyAdded =
-                              playlist
-                                .songIds
-                                .includes(
-                                  song.id
-                                );
+                      {playlists.playlists.map((playlist) => {
+                        const alreadyAdded = playlist.songIds.includes(song.id);
 
-                            return (
-                              <TouchableOpacity
-                                key={
-                                  playlist.id
-                                }
-                                style={[
-                                  styles.playlistRow,
+                        return (
+                          <TouchableOpacity
+                            key={playlist.id}
+                            style={[
+                              styles.playlistRow,
 
-                                  alreadyAdded &&
-                                    styles.playlistRowAdded,
-                                ]}
-                                activeOpacity={0.72}
-                                onPress={() =>
-                                  addCurrentSongToPlaylist(
-                                    playlist.id
-                                  )
+                              alreadyAdded && styles.playlistRowAdded,
+                            ]}
+                            activeOpacity={0.72}
+                            onPress={() =>
+                              addCurrentSongToPlaylist(playlist.id)
+                            }
+                          >
+                            <View style={styles.playlistRowIcon}>
+                              <MaterialCommunityIcons
+                                name="playlist-music"
+                                size={23}
+                                color={
+                                  alreadyAdded
+                                    ? COLORS.purpleLight
+                                    : COLORS.white
                                 }
+                              />
+                            </View>
+
+                            <View style={styles.playlistRowText}>
+                              <Text
+                                style={styles.playlistRowTitle}
+                                numberOfLines={1}
                               >
-                                <View
-                                  style={
-                                    styles.playlistRowIcon
-                                  }
-                                >
-                                  <MaterialCommunityIcons
-                                    name="playlist-music"
-                                    size={23}
-                                    color={
-                                      alreadyAdded
-                                        ? COLORS.purpleLight
-                                        : COLORS.white
-                                    }
-                                  />
-                                </View>
+                                {playlist.name}
+                              </Text>
 
-                                <View
-                                  style={
-                                    styles.playlistRowText
-                                  }
-                                >
-                                  <Text
-                                    style={
-                                      styles.playlistRowTitle
-                                    }
-                                    numberOfLines={1}
-                                  >
-                                    {playlist.name}
-                                  </Text>
+                              <Text style={styles.playlistRowSubtitle}>
+                                {playlist.songIds.length}{" "}
+                                {playlist.songIds.length === 1
+                                  ? "canción"
+                                  : "canciones"}
+                              </Text>
+                            </View>
 
-                                  <Text
-                                    style={
-                                      styles.playlistRowSubtitle
-                                    }
-                                  >
-                                    {
-                                      playlist
-                                        .songIds
-                                        .length
-                                    } {
-                                      playlist
-                                        .songIds
-                                        .length === 1
-                                        ? 'canción'
-                                        : 'canciones'
-                                    }
-                                  </Text>
-                                </View>
-
-                                <MaterialCommunityIcons
-                                  name={
-                                    alreadyAdded
-                                      ? 'check-circle'
-                                      : 'plus-circle-outline'
-                                  }
-                                  size={24}
-                                  color={
-                                    alreadyAdded
-                                      ? COLORS.purpleLight
-                                      : '#CFCFD6'
-                                  }
-                                />
-                              </TouchableOpacity>
-                            );
-                          }
-                        )}
+                            <MaterialCommunityIcons
+                              name={
+                                alreadyAdded
+                                  ? "check-circle"
+                                  : "plus-circle-outline"
+                              }
+                              size={24}
+                              color={
+                                alreadyAdded ? COLORS.purpleLight : "#CFCFD6"
+                              }
+                            />
+                          </TouchableOpacity>
+                        );
+                      })}
                     </ScrollView>
                   )}
                 </View>
@@ -1521,1013 +955,692 @@ function PlayerModal({
         </View>
       </Modal>
 
-
       {lyricsOpen ? (
         <LyricsModalConnected
-          visible={
-            lyricsOpen
-          }
-
-          song={
-            song
-          }
-
-          onClose={() =>
-            setLyricsOpen(
-              false
-            )
-          }
+          visible={lyricsOpen}
+          song={song}
+          onClose={() => setLyricsOpen(false)}
         />
       ) : null}
 
-
       {equalizerOpen ? (
         <EqualizerModal
-          visible={
-            equalizerOpen
-          }
-
-          onClose={() =>
-            setEqualizerOpen(
-              false
-            )
-          }
+          visible={equalizerOpen}
+          onClose={() => setEqualizerOpen(false)}
         />
       ) : null}
     </>
   );
 }
 
+export default memo(PlayerModal);
 
-export default memo(
-  PlayerModal
-);
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
 
+    backgroundColor: COLORS.background,
+  },
 
-const styles =
-  StyleSheet.create({
-    container: {
-      flex: 1,
+  safeArea: {
+    flex: 1,
+  },
 
-      backgroundColor:
-        COLORS.background,
-    },
+  /*
+   * =====================================================
+   * FONDO
+   * =====================================================
+   */
 
+  generatedBackground: {
+    position: "absolute",
 
-    safeArea: {
-      flex: 1,
-    },
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
 
+  neutralBackground: {
+    position: "absolute",
 
-    /*
-     * =====================================================
-     * FONDO
-     * =====================================================
-     */
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
 
-    generatedBackground: {
-      position: 'absolute',
+    backgroundColor: "#09090F",
+  },
 
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-    },
+  generatedGlowOne: {
+    position: "absolute",
 
+    width: 620,
 
-    neutralBackground: {
-      position: 'absolute',
+    height: 620,
 
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+    borderRadius: 310,
 
-      backgroundColor:
-        '#09090F',
-    },
+    top: -320,
 
+    right: -270,
 
-    generatedGlowOne: {
-      position:
-        'absolute',
+    opacity: 0.4,
+  },
 
-      width:
-        620,
+  generatedGlowTwo: {
+    position: "absolute",
 
-      height:
-        620,
+    width: 560,
 
-      borderRadius:
-        310,
+    height: 560,
 
-      top:
-        -320,
+    borderRadius: 280,
 
-      right:
-        -270,
+    bottom: -300,
 
-      opacity:
-        0.40,
-    },
+    left: -310,
 
+    opacity: 0.3,
+  },
 
-    generatedGlowTwo: {
-      position:
-        'absolute',
+  generatedGlowThree: {
+    position: "absolute",
 
-      width:
-        560,
+    width: 390,
 
-      height:
-        560,
+    height: 390,
 
-      borderRadius:
-        280,
+    borderRadius: 195,
 
-      bottom:
-        -300,
+    top: 280,
 
-      left:
-        -310,
+    right: -240,
 
-      opacity:
-        0.30,
-    },
+    opacity: 0.14,
+  },
 
+  backgroundImage: {
+    position: "absolute",
 
-    generatedGlowThree: {
-      position:
-        'absolute',
+    top: -45,
 
-      width:
-        390,
+    left: -45,
 
-      height:
-        390,
+    right: -45,
 
-      borderRadius:
-        195,
+    bottom: -45,
+  },
 
-      top:
-        280,
+  darkOverlay: {
+    position: "absolute",
 
-      right:
-        -240,
+    top: 0,
 
-      opacity:
-        0.14,
-    },
+    left: 0,
 
+    right: 0,
 
-    backgroundImage: {
-      position:
-        'absolute',
+    bottom: 0,
+  },
 
-      top:
-        -45,
+  darkOverlayGenerated: {
+    backgroundColor: "rgba(8,8,12,0.42)",
+  },
 
-      left:
-        -45,
+  darkOverlayWithArtwork: {
+    backgroundColor: "rgba(8,8,12,0.52)",
+  },
 
-      right:
-        -45,
+  /*
+   * =====================================================
+   * HEADER
+   * =====================================================
+   */
 
-      bottom:
-        -45,
-    },
+  topBar: {
+    flexDirection: "row",
 
+    alignItems: "center",
 
-    darkOverlay: {
-      position:
-        'absolute',
+    justifyContent: "space-between",
 
-      top:
-        0,
+    zIndex: 10,
+  },
 
-      left:
-        0,
+  topButton: {
+    width: 44,
 
-      right:
-        0,
+    height: 44,
 
-      bottom:
-        0,
-    },
+    borderRadius: 22,
 
+    backgroundColor: "rgba(255,255,255,0.11)",
 
-    darkOverlayGenerated: {
-      backgroundColor:
-        'rgba(8,8,12,0.42)',
-    },
+    borderWidth: StyleSheet.hairlineWidth,
 
+    borderColor: "rgba(255,255,255,0.18)",
 
-    darkOverlayWithArtwork: {
-      backgroundColor:
-        'rgba(8,8,12,0.52)',
-    },
+    justifyContent: "center",
 
+    alignItems: "center",
+  },
 
-    /*
-     * =====================================================
-     * HEADER
-     * =====================================================
-     */
+  topButtonCompact: {
+    width: 40,
 
-    topBar: {
-      flexDirection:
-        'row',
+    height: 40,
 
-      alignItems:
-        'center',
+    borderRadius: 20,
+  },
 
-      justifyContent:
-        'space-between',
+  favoriteButtonActive: {
+    backgroundColor: "rgba(236,72,153,0.18)",
 
-      zIndex:
-        10,
-    },
+    borderColor: "rgba(236,72,153,0.35)",
+  },
 
+  topCenter: {
+    flex: 1,
 
-    topButton: {
-      width:
-        44,
+    alignItems: "center",
 
-      height:
-        44,
+    paddingHorizontal: 8,
+  },
 
-      borderRadius:
-        22,
+  nowPlayingLabel: {
+    color: "rgba(255,255,255,0.68)",
 
-      backgroundColor:
-        'rgba(255,255,255,0.11)',
+    fontSize: 8,
 
-      borderWidth:
-        StyleSheet.hairlineWidth,
+    fontWeight: "700",
 
-      borderColor:
-        'rgba(255,255,255,0.18)',
+    letterSpacing: 1.6,
+  },
 
-      justifyContent:
-        'center',
+  nowPlayingArtist: {
+    color: COLORS.white,
 
-      alignItems:
-        'center',
-    },
+    fontSize: 11,
 
+    fontWeight: "600",
 
-    topButtonCompact: {
-      width:
-        40,
+    marginTop: 3,
 
-      height:
-        40,
+    textAlign: "center",
+  },
 
-      borderRadius:
-        20,
-    },
+  /*
+   * =====================================================
+   * CONTENIDO
+   * =====================================================
+   */
 
+  mainContent: {
+    flex: 1,
 
-    favoriteButtonActive: {
-      backgroundColor:
-        'rgba(236,72,153,0.18)',
+    paddingHorizontal: 2,
 
-      borderColor:
-        'rgba(236,72,153,0.35)',
-    },
+    justifyContent: "flex-start",
 
+    minHeight: 0,
+  },
 
-    topCenter: {
-      flex:
-        1,
+  /*
+   * =====================================================
+   * CARÁTULA
+   * =====================================================
+   */
 
-      alignItems:
-        'center',
+  artworkStage: {
+    width: "100%",
 
-      paddingHorizontal:
-        8,
-    },
+    alignItems: "center",
 
+    justifyContent: "center",
 
-    nowPlayingLabel: {
-      color:
-        'rgba(255,255,255,0.68)',
+    flexShrink: 0,
+  },
 
-      fontSize:
-        8,
+  artworkShell: {
+    overflow: "hidden",
 
-      fontWeight:
-        '700',
+    backgroundColor: COLORS.surface,
 
-      letterSpacing:
-        1.6,
-    },
+    borderWidth: 1,
 
+    borderColor: "rgba(255,255,255,0.17)",
 
-    nowPlayingArtist: {
-      color:
-        COLORS.white,
+    elevation: 12,
+  },
 
-      fontSize:
-        11,
+  /*
+   * =====================================================
+   * INFORMACIÓN
+   * =====================================================
+   */
 
-      fontWeight:
-        '600',
+  songInfo: {
+    flexShrink: 0,
+  },
 
-      marginTop:
-        3,
+  title: {
+    color: COLORS.white,
 
-      textAlign:
-        'center',
-    },
+    fontWeight: "700",
 
+    letterSpacing: -0.25,
+  },
 
-    /*
-     * =====================================================
-     * CONTENIDO
-     * =====================================================
-     */
+  artist: {
+    color: "#E2E2E8",
 
-    mainContent: {
-      flex:
-        1,
+    lineHeight: 18,
 
-      paddingHorizontal:
-        2,
+    fontWeight: "500",
+  },
 
-      justifyContent:
-        'flex-start',
+  albumRow: {
+    minHeight: 17,
 
-      minHeight:
-        0,
-    },
+    flexDirection: "row",
 
+    alignItems: "center",
 
-    /*
-     * =====================================================
-     * CARÁTULA
-     * =====================================================
-     */
+    gap: 5,
+  },
 
-    artworkStage: {
-      width:
-        '100%',
+  album: {
+    flex: 1,
 
-      alignItems:
-        'center',
+    color: "#B6B6BE",
 
-      justifyContent:
-        'center',
+    fontSize: 10,
+  },
 
-      flexShrink:
-        0,
-    },
+  /*
+   * =====================================================
+   * PROGRESO
+   * =====================================================
+   */
 
+  progressArea: {
+    flexShrink: 0,
 
-    artworkShell: {
-      overflow:
-        'hidden',
+    marginBottom: 0,
+  },
 
-      backgroundColor:
-        COLORS.surface,
+  /*
+   * =====================================================
+   * CONTROLES
+   * =====================================================
+   */
 
-      borderWidth:
-        1,
+  controls: {
+    flexDirection: "row",
 
-      borderColor:
-        'rgba(255,255,255,0.17)',
+    alignItems: "center",
 
-      elevation:
-        12,
-    },
+    justifyContent: "space-between",
 
+    flexShrink: 0,
+  },
 
-    /*
-     * =====================================================
-     * INFORMACIÓN
-     * =====================================================
-     */
+  secondaryControl: {
+    backgroundColor: "rgba(255,255,255,0.075)",
 
-    songInfo: {
-      flexShrink:
-        0,
-    },
+    borderWidth: StyleSheet.hairlineWidth,
 
+    borderColor: "rgba(255,255,255,0.12)",
 
-    title: {
-      color:
-        COLORS.white,
+    alignItems: "center",
 
-      fontWeight:
-        '700',
+    justifyContent: "center",
 
-      letterSpacing:
-        -0.25,
-    },
+    position: "relative",
+  },
 
+  secondaryControlActive: {
+    backgroundColor: "rgba(139,92,246,0.20)",
 
-    artist: {
-      color:
-        '#E2E2E8',
+    borderColor: "rgba(167,139,250,0.35)",
+  },
 
-      lineHeight:
-        18,
+  activeDot: {
+    position: "absolute",
 
-      fontWeight:
-        '500',
-    },
+    bottom: 4,
 
+    width: 4,
 
-    albumRow: {
-      minHeight:
-        17,
+    height: 4,
 
-      flexDirection:
-        'row',
+    borderRadius: 2,
 
-      alignItems:
-        'center',
+    backgroundColor: COLORS.purpleLight,
+  },
 
-      gap:
-        5,
-    },
+  skipButton: {
+    justifyContent: "center",
 
+    alignItems: "center",
+  },
 
-    album: {
-      flex:
-        1,
+  playButton: {
+    backgroundColor: COLORS.purple,
 
-      color:
-        '#B6B6BE',
+    justifyContent: "center",
 
-      fontSize:
-        10,
-    },
+    alignItems: "center",
 
+    elevation: 10,
 
-    /*
-     * =====================================================
-     * PROGRESO
-     * =====================================================
-     */
+    borderWidth: 1,
 
-    progressArea: {
-      flexShrink:
-        0,
+    borderColor: "rgba(255,255,255,0.24)",
+  },
 
-      marginBottom:
-        0,
-    },
+  /*
+   * =====================================================
+   * FOOTER
+   * =====================================================
+   */
 
+  footer: {
+    flexDirection: "row",
 
-    /*
-     * =====================================================
-     * CONTROLES
-     * =====================================================
-     */
+    alignItems: "center",
 
-    controls: {
-      flexDirection:
-        'row',
+    marginTop: "auto",
 
-      alignItems:
-        'center',
+    flexShrink: 0,
+  },
 
-      justifyContent:
-        'space-between',
+  footerAction: {
+    flex: 1,
 
-      flexShrink:
-        0,
-    },
+    height: 54,
 
+    borderRadius: 17,
 
-    secondaryControl: {
-      backgroundColor:
-        'rgba(255,255,255,0.075)',
+    backgroundColor: "rgba(255,255,255,0.095)",
 
-      borderWidth:
-        StyleSheet.hairlineWidth,
+    borderWidth: StyleSheet.hairlineWidth,
 
-      borderColor:
-        'rgba(255,255,255,0.12)',
+    borderColor: "rgba(255,255,255,0.14)",
 
-      alignItems:
-        'center',
+    justifyContent: "center",
 
-      justifyContent:
-        'center',
+    alignItems: "center",
 
-      position:
-        'relative',
-    },
+    paddingHorizontal: 4,
+  },
 
+  footerActionCompact: {
+    height: 49,
 
-    secondaryControlActive: {
-      backgroundColor:
-        'rgba(139,92,246,0.20)',
+    borderRadius: 15,
+  },
 
-      borderColor:
-        'rgba(167,139,250,0.35)',
-    },
+  footerActionActive: {
+    backgroundColor: "rgba(139,92,246,0.20)",
 
+    borderColor: "rgba(167,139,250,0.34)",
+  },
 
-    activeDot: {
-      position:
-        'absolute',
+  footerIcon: {
+    height: 23,
 
-      bottom:
-        4,
+    justifyContent: "center",
 
-      width:
-        4,
+    alignItems: "center",
+  },
 
-      height:
-        4,
+  footerIconCompact: {
+    height: 20,
+  },
 
-      borderRadius:
-        2,
+  footerText: {
+    color: "#D5D5DC",
 
-      backgroundColor:
-        COLORS.purpleLight,
-    },
+    fontSize: 9,
 
+    fontWeight: "600",
 
-    skipButton: {
-      justifyContent:
-        'center',
+    textAlign: "center",
 
-      alignItems:
-        'center',
-    },
+    marginTop: 3,
+  },
 
+  footerTextCompact: {
+    fontSize: 8,
 
-    playButton: {
-      backgroundColor:
-        COLORS.purple,
+    marginTop: 2,
+  },
 
-      justifyContent:
-        'center',
+  footerTextActive: {
+    color: COLORS.purpleLight,
+  },
 
-      alignItems:
-        'center',
+  /*
+   * =====================================================
+   * PLAYLIST SHEET
+   * =====================================================
+   */
 
-      elevation:
-        10,
+  playlistOverlay: {
+    position: "absolute",
 
-      borderWidth:
-        1,
+    top: 0,
 
-      borderColor:
-        'rgba(255,255,255,0.24)',
-    },
+    left: 0,
 
+    right: 0,
 
-    /*
-     * =====================================================
-     * FOOTER
-     * =====================================================
-     */
+    bottom: 0,
 
-    footer: {
-      flexDirection:
-        'row',
+    justifyContent: "flex-end",
 
-      alignItems:
-        'center',
+    zIndex: 50,
+  },
 
-      marginTop:
-        'auto',
+  playlistBackdrop: {
+    position: "absolute",
 
-      flexShrink:
-        0,
-    },
+    top: 0,
 
+    left: 0,
 
-    footerAction: {
-      flex:
-        1,
+    right: 0,
 
-      height:
-        54,
+    bottom: 0,
 
-      borderRadius:
-        17,
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
 
-      backgroundColor:
-        'rgba(255,255,255,0.095)',
+  playlistSheet: {
+    maxHeight: "58%",
 
-      borderWidth:
-        StyleSheet.hairlineWidth,
+    minHeight: 220,
 
-      borderColor:
-        'rgba(255,255,255,0.14)',
+    backgroundColor: "#17171F",
 
-      justifyContent:
-        'center',
+    borderTopLeftRadius: 26,
 
-      alignItems:
-        'center',
+    borderTopRightRadius: 26,
 
-      paddingHorizontal:
-        4,
-    },
+    borderWidth: StyleSheet.hairlineWidth,
 
+    borderColor: "rgba(255,255,255,0.13)",
 
-    footerActionCompact: {
-      height:
-        49,
+    paddingTop: 8,
 
-      borderRadius:
-        15,
-    },
+    paddingHorizontal: 16,
 
+    paddingBottom: 18,
 
-    footerActionActive: {
-      backgroundColor:
-        'rgba(139,92,246,0.20)',
+    elevation: 20,
+  },
 
-      borderColor:
-        'rgba(167,139,250,0.34)',
-    },
+  playlistHandle: {
+    alignSelf: "center",
 
+    width: 42,
 
-    footerIcon: {
-      height:
-        23,
+    height: 4,
 
-      justifyContent:
-        'center',
+    borderRadius: 2,
 
-      alignItems:
-        'center',
-    },
+    backgroundColor: "rgba(255,255,255,0.25)",
 
+    marginBottom: 12,
+  },
 
-    footerIconCompact: {
-      height:
-        20,
-    },
+  playlistHeader: {
+    flexDirection: "row",
 
+    alignItems: "center",
 
-    footerText: {
-      color:
-        '#D5D5DC',
+    marginBottom: 12,
+  },
 
-      fontSize:
-        9,
+  playlistHeaderText: {
+    flex: 1,
 
-      fontWeight:
-        '600',
+    paddingRight: 12,
+  },
 
-      textAlign:
-        'center',
+  playlistTitle: {
+    color: COLORS.white,
 
-      marginTop:
-        3,
-    },
+    fontSize: 18,
 
+    fontWeight: "700",
+  },
 
-    footerTextCompact: {
-      fontSize:
-        8,
+  playlistSubtitle: {
+    color: "#AAAAAF",
 
-      marginTop:
-        2,
-    },
+    fontSize: 11,
 
+    marginTop: 3,
+  },
 
-    footerTextActive: {
-      color:
-        COLORS.purpleLight,
-    },
+  playlistClose: {
+    width: 38,
 
+    height: 38,
 
-    /*
-     * =====================================================
-     * PLAYLIST SHEET
-     * =====================================================
-     */
+    borderRadius: 19,
 
-    playlistOverlay: {
-      position:
-        'absolute',
+    alignItems: "center",
 
-      top:
-        0,
+    justifyContent: "center",
 
-      left:
-        0,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
 
-      right:
-        0,
+  playlistList: {
+    flexGrow: 0,
+  },
 
-      bottom:
-        0,
+  playlistListContent: {
+    paddingBottom: 4,
+  },
 
-      justifyContent:
-        'flex-end',
+  playlistRow: {
+    minHeight: 62,
 
-      zIndex:
-        50,
-    },
+    borderRadius: 16,
 
+    flexDirection: "row",
 
-    playlistBackdrop: {
-      position:
-        'absolute',
+    alignItems: "center",
 
-      top:
-        0,
+    paddingHorizontal: 12,
 
-      left:
-        0,
+    marginBottom: 8,
 
-      right:
-        0,
+    backgroundColor: "rgba(255,255,255,0.065)",
 
-      bottom:
-        0,
+    borderWidth: StyleSheet.hairlineWidth,
 
-      backgroundColor:
-        'rgba(0,0,0,0.58)',
-    },
+    borderColor: "rgba(255,255,255,0.10)",
+  },
 
+  playlistRowAdded: {
+    backgroundColor: "rgba(139,92,246,0.13)",
 
-    playlistSheet: {
-      maxHeight:
-        '58%',
+    borderColor: "rgba(167,139,250,0.28)",
+  },
 
-      minHeight:
-        220,
+  playlistRowIcon: {
+    width: 40,
 
-      backgroundColor:
-        '#17171F',
+    height: 40,
 
-      borderTopLeftRadius:
-        26,
+    borderRadius: 12,
 
-      borderTopRightRadius:
-        26,
+    alignItems: "center",
 
-      borderWidth:
-        StyleSheet.hairlineWidth,
+    justifyContent: "center",
 
-      borderColor:
-        'rgba(255,255,255,0.13)',
+    marginRight: 10,
 
-      paddingTop:
-        8,
+    backgroundColor: "rgba(255,255,255,0.075)",
+  },
 
-      paddingHorizontal:
-        16,
+  playlistRowText: {
+    flex: 1,
 
-      paddingBottom:
-        18,
+    paddingRight: 10,
+  },
 
-      elevation:
-        20,
-    },
+  playlistRowTitle: {
+    color: COLORS.white,
 
+    fontSize: 13,
 
-    playlistHandle: {
-      alignSelf:
-        'center',
+    fontWeight: "600",
+  },
 
-      width:
-        42,
+  playlistRowSubtitle: {
+    color: "#A9A9B1",
 
-      height:
-        4,
+    fontSize: 10,
 
-      borderRadius:
-        2,
+    marginTop: 3,
+  },
 
-      backgroundColor:
-        'rgba(255,255,255,0.25)',
+  playlistEmpty: {
+    alignItems: "center",
 
-      marginBottom:
-        12,
-    },
+    justifyContent: "center",
 
+    paddingHorizontal: 20,
 
-    playlistHeader: {
-      flexDirection:
-        'row',
+    paddingVertical: 24,
+  },
 
-      alignItems:
-        'center',
+  playlistEmptyTitle: {
+    color: COLORS.white,
 
-      marginBottom:
-        12,
-    },
+    fontSize: 15,
 
+    fontWeight: "700",
 
-    playlistHeaderText: {
-      flex:
-        1,
+    marginTop: 10,
+  },
 
-      paddingRight:
-        12,
-    },
+  playlistEmptyText: {
+    color: "#A8A8B0",
 
+    fontSize: 11,
 
-    playlistTitle: {
-      color:
-        COLORS.white,
+    lineHeight: 17,
 
-      fontSize:
-        18,
+    textAlign: "center",
 
-      fontWeight:
-        '700',
-    },
-
-
-    playlistSubtitle: {
-      color:
-        '#AAAAAF',
-
-      fontSize:
-        11,
-
-      marginTop:
-        3,
-    },
-
-
-    playlistClose: {
-      width:
-        38,
-
-      height:
-        38,
-
-      borderRadius:
-        19,
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
-      backgroundColor:
-        'rgba(255,255,255,0.08)',
-    },
-
-
-    playlistList: {
-      flexGrow:
-        0,
-    },
-
-
-    playlistListContent: {
-      paddingBottom:
-        4,
-    },
-
-
-    playlistRow: {
-      minHeight:
-        62,
-
-      borderRadius:
-        16,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
-      paddingHorizontal:
-        12,
-
-      marginBottom:
-        8,
-
-      backgroundColor:
-        'rgba(255,255,255,0.065)',
-
-      borderWidth:
-        StyleSheet.hairlineWidth,
-
-      borderColor:
-        'rgba(255,255,255,0.10)',
-    },
-
-
-    playlistRowAdded: {
-      backgroundColor:
-        'rgba(139,92,246,0.13)',
-
-      borderColor:
-        'rgba(167,139,250,0.28)',
-    },
-
-
-    playlistRowIcon: {
-      width:
-        40,
-
-      height:
-        40,
-
-      borderRadius:
-        12,
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
-      marginRight:
-        10,
-
-      backgroundColor:
-        'rgba(255,255,255,0.075)',
-    },
-
-
-    playlistRowText: {
-      flex:
-        1,
-
-      paddingRight:
-        10,
-    },
-
-
-    playlistRowTitle: {
-      color:
-        COLORS.white,
-
-      fontSize:
-        13,
-
-      fontWeight:
-        '600',
-    },
-
-
-    playlistRowSubtitle: {
-      color:
-        '#A9A9B1',
-
-      fontSize:
-        10,
-
-      marginTop:
-        3,
-    },
-
-
-    playlistEmpty: {
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
-      paddingHorizontal:
-        20,
-
-      paddingVertical:
-        24,
-    },
-
-
-    playlistEmptyTitle: {
-      color:
-        COLORS.white,
-
-      fontSize:
-        15,
-
-      fontWeight:
-        '700',
-
-      marginTop:
-        10,
-    },
-
-
-    playlistEmptyText: {
-      color:
-        '#A8A8B0',
-
-      fontSize:
-        11,
-
-      lineHeight:
-        17,
-
-      textAlign:
-        'center',
-
-      marginTop:
-        6,
-    },
-  });
+    marginTop: 6,
+  },
+});

@@ -1,5 +1,6 @@
 package expo.modules.hmusicequalizer
 
+import android.content.Context
 import android.media.audiofx.Equalizer
 
 import expo.modules.kotlin.modules.Module
@@ -17,6 +18,11 @@ class HmusicEqualizerModule : Module() {
       0
 
 
+  /*
+   * =========================================================
+   * LIBERAR ECUALIZADOR ACTUAL
+   * =========================================================
+   */
   private fun releaseCurrent() {
 
     try {
@@ -24,7 +30,8 @@ class HmusicEqualizerModule : Module() {
         ?.enabled =
         false
     } catch (
-      _: Exception
+      _:
+        Throwable
     ) {
     }
 
@@ -33,7 +40,8 @@ class HmusicEqualizerModule : Module() {
       equalizer
         ?.release()
     } catch (
-      _: Exception
+      _:
+        Throwable
     ) {
     }
 
@@ -43,8 +51,119 @@ class HmusicEqualizerModule : Module() {
   }
 
 
+  /*
+   * =========================================================
+   * OBTENER CONTEXTO ANDROID
+   * =========================================================
+   */
+  private fun getAndroidContext():
+    Context {
+
+    return appContext
+      .reactContext
+      ?.applicationContext
+      ?: throw Exception(
+        "No se pudo acceder al contexto de Android."
+      )
+  }
+
+
+  /*
+   * =========================================================
+   * OBTENER AUDIO SESSION ID GUARDADO POR RNTP
+   * =========================================================
+   */
+  private fun getStoredAudioSessionId():
+    Int {
+
+    val context =
+      getAndroidContext()
+
+
+    val preferences =
+      context
+        .getSharedPreferences(
+          "hmusic_audio_session",
+          Context.MODE_PRIVATE
+        )
+
+
+    return preferences
+      .getInt(
+        "audio_session_id",
+        0
+      )
+  }
+
+
+  /*
+   * =========================================================
+   * ACTUALIZAR LA SESIÓN REAL
+   * =========================================================
+   */
+  private fun syncAudioSessionId() {
+
+    val storedSessionId =
+      getStoredAudioSessionId()
+
+
+    /*
+     * Si RNTP todavía no guardó una sesión válida,
+     * conservamos la sesión que pudiera haberse establecido
+     * mediante setAudioSessionIdAsync().
+     */
+    if (
+      storedSessionId <=
+        0
+    ) {
+
+      return
+    }
+
+
+    /*
+     * Si Media3 creó una nueva sesión,
+     * liberamos el Equalizer anterior.
+     */
+    if (
+      audioSessionId !=
+        storedSessionId
+    ) {
+
+      releaseCurrent()
+
+      audioSessionId =
+        storedSessionId
+    }
+  }
+
+
+  /*
+   * =========================================================
+   * OBTENER / CREAR ECUALIZADOR
+   * =========================================================
+   */
   private fun requireEqualizer():
     Equalizer {
+
+    /*
+     * Antes de crear el efecto,
+     * sincronizamos la sesión del reproductor.
+     */
+    syncAudioSessionId()
+
+
+    if (
+      audioSessionId <=
+        0
+    ) {
+
+      throw Exception(
+        "Todavía no existe una sesión de audio activa. " +
+          "Reproduce una canción e inténtalo nuevamente."
+      )
+    }
+
 
     val existing =
       equalizer
@@ -52,7 +171,7 @@ class HmusicEqualizerModule : Module() {
 
     if (
       existing !=
-      null
+        null
     ) {
 
       return existing
@@ -73,10 +192,11 @@ class HmusicEqualizerModule : Module() {
       ) {
 
         throw Exception(
-          "El ecualizador no está disponible: ${
-            error.message
-              ?: "error desconocido"
-          }"
+          "El ecualizador no está disponible para la sesión " +
+            "$audioSessionId: ${
+              error.message
+                ?: "error desconocido"
+            }"
         )
       }
 
@@ -89,6 +209,11 @@ class HmusicEqualizerModule : Module() {
   }
 
 
+  /*
+   * =========================================================
+   * LIMITAR NIVEL DE UNA BANDA
+   * =========================================================
+   */
   private fun clampLevel(
     eq:
       Equalizer,
@@ -123,6 +248,11 @@ class HmusicEqualizerModule : Module() {
   }
 
 
+  /*
+   * =========================================================
+   * CONSTRUIR INFORMACIÓN DEL ECUALIZADOR
+   * =========================================================
+   */
   private fun buildInfo():
     Map<String, Any?> {
 
@@ -253,6 +383,11 @@ class HmusicEqualizerModule : Module() {
   }
 
 
+  /*
+   * =========================================================
+   * MÓDULO EXPO
+   * =========================================================
+   */
   override fun definition() =
     ModuleDefinition {
 
@@ -261,6 +396,11 @@ class HmusicEqualizerModule : Module() {
       )
 
 
+      /*
+       * -------------------------------------------------------
+       * INFORMACIÓN DEL ECUALIZADOR
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "getEqualizerInfoAsync"
       ) {
@@ -269,6 +409,11 @@ class HmusicEqualizerModule : Module() {
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * ACTIVAR / DESACTIVAR
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "setEqualizerEnabledAsync"
       ) {
@@ -288,6 +433,11 @@ class HmusicEqualizerModule : Module() {
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * CAMBIAR UNA BANDA
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "setEqualizerBandLevelAsync"
       ) {
@@ -335,6 +485,11 @@ class HmusicEqualizerModule : Module() {
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * CAMBIAR TODAS LAS BANDAS
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "setEqualizerLevelsAsync"
       ) {
@@ -382,6 +537,11 @@ class HmusicEqualizerModule : Module() {
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * RESTABLECER
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "resetEqualizerAsync"
       ) {
@@ -417,6 +577,13 @@ class HmusicEqualizerModule : Module() {
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * ESTABLECER SESIÓN MANUALMENTE
+       *
+       * Lo dejamos disponible por compatibilidad.
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "setAudioSessionIdAsync"
       ) {
@@ -425,34 +592,40 @@ class HmusicEqualizerModule : Module() {
 
 
         if (
-          nextAudioSessionId <
-          0
+          nextAudioSessionId <=
+            0
         ) {
 
           throw Exception(
-            "audioSessionId no puede ser negativo."
+            "audioSessionId debe ser mayor que 0."
           )
         }
 
 
         if (
           audioSessionId !=
-          nextAudioSessionId
+            nextAudioSessionId
         ) {
 
           releaseCurrent()
 
           audioSessionId =
             nextAudioSessionId
-
-          requireEqualizer()
         }
+
+
+        requireEqualizer()
 
 
         buildInfo()
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * LIBERAR
+       * -------------------------------------------------------
+       */
       AsyncFunction(
         "releaseEqualizerAsync"
       ) {
@@ -463,6 +636,11 @@ class HmusicEqualizerModule : Module() {
       }
 
 
+      /*
+       * -------------------------------------------------------
+       * DESTRUIR MÓDULO
+       * -------------------------------------------------------
+       */
       OnDestroy {
 
         releaseCurrent()

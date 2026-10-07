@@ -3,22 +3,8 @@ import {
 } from '@expo/vector-icons';
 
 import {
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-
-import {
-  router,
+  useLocalSearchParams,
 } from 'expo-router';
-
-import {
-  SafeAreaView,
-} from 'react-native-safe-area-context';
 
 import {
   useMemo,
@@ -26,33 +12,36 @@ import {
 } from 'react';
 
 import {
-  useApp,
-} from '../context/AppContext';
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import {
-  useNavigationLock,
-} from '../hooks/useNavigationLock';
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+
+import {
+  useApp,
+} from '../context/AppContext';
 
 import {
   COLORS,
 } from '../constants/colors';
 
-import ScreenHeader
-  from '../components/ScreenHeader';
-
-import RenamePlaylistModal
-  from '../components/RenamePlaylistModal';
-
-import type {
-  Playlist,
-} from '../types/Song';
+import SongCollectionScreen
+  from '../components/SongCollectionScreen';
 
 
 /* =========================================================
-   DURACIÓN
+   FORMATO DE DURACIÓN
 ========================================================= */
 
-function formatDuration(
+function formatTotalDuration(
   seconds:
     number
 ) {
@@ -103,7 +92,16 @@ function formatDuration(
    PANTALLA
 ========================================================= */
 
-export default function PlaylistsScreen() {
+export default function PlaylistScreen() {
+  const {
+    id,
+  } =
+    useLocalSearchParams<{
+      id?:
+        string;
+    }>();
+
+
   const {
     library,
     playlists,
@@ -111,531 +109,497 @@ export default function PlaylistsScreen() {
     useApp();
 
 
-  const navigateOnce =
-    useNavigationLock();
-
-
   const [
-    name,
-    setName,
+    reorderOpen,
+    setReorderOpen,
   ] =
     useState(
-      ''
+      false
     );
 
 
-  const [
-    renameTarget,
-    setRenameTarget,
-  ] =
-    useState<
-      Playlist | null
-    >(
-      null
-    );
+  const playlist =
+    playlists
+      .playlists
+      .find(
+        item =>
+          item.id ===
+            id
+      );
 
 
-  const songMap =
-    useMemo(
-      () =>
-        new Map(
-          library.songs.map(
-            song => [
-              song.id,
-              song,
-            ]
-          )
-        ),
-      [
-        library.songs,
-      ]
-    );
-
-
-  const playlistDurations =
+  const songs =
     useMemo(
       () => {
-        const result =
-          new Map<
-            string,
-            number
-          >();
+        if (
+          !playlist
+        ) {
+          return [];
+        }
 
 
-        playlists
-          .playlists
-          .forEach(
-            playlist => {
-              const total =
-                playlist
-                  .songIds
-                  .reduce(
-                    (
-                      sum,
-                      songId
-                    ) => {
-                      const song =
-                        songMap.get(
-                          songId
-                        );
-
-
-                      return sum +
-                        (
-                          Number(
-                            song?.duration
-                          ) || 0
-                        );
-                    },
-                    0
-                  );
-
-
-              result.set(
-                playlist.id,
-                total
-              );
-            }
+        const map =
+          new Map(
+            library.songs
+              .map(
+                song => [
+                  song.id,
+                  song,
+                ]
+              )
           );
 
 
-        return result;
+        return playlist
+          .songIds
+          .map(
+            songId =>
+              map.get(
+                songId
+              )
+          )
+          .filter(
+            Boolean
+          ) as
+            typeof library.songs;
       },
       [
-        playlists.playlists,
-        songMap,
+        library.songs,
+        playlist?.songIds,
       ]
     );
 
 
-  const create =
-    () => {
-      const result =
-        playlists
-          .createPlaylist(
-            name
-          );
+  const totalDuration =
+    useMemo(
+      () =>
+        songs.reduce(
+          (
+            total,
+            song
+          ) =>
+            total +
+            (
+              Number(
+                song.duration
+              ) || 0
+            ),
+          0
+        ),
+      [
+        songs,
+      ]
+    );
 
 
-      if (
-        result
-      ) {
-        setName(
-          ''
-        );
+  const subtitle =
+    songs.length ===
+      1
 
-        return;
-      }
+      ? `1 canción · ${formatTotalDuration(
+          totalDuration
+        )}`
 
-
-      if (
-        name.trim()
-      ) {
-        Alert.alert(
-          'No se pudo crear',
-          'Usa un nombre diferente para la playlist.'
-        );
-      }
-    };
+      : `${songs.length} canciones · ${formatTotalDuration(
+          totalDuration
+        )}`;
 
 
   return (
-    <SafeAreaView
+    <View
       style={
         styles.container
       }
     >
-      <ScreenHeader
-        title=
-          "Playlists"
+      <SongCollectionScreen
+        title={
+          playlist?.name ??
+          'Playlist'
+        }
 
         subtitle={
-          playlists
-            .playlists
-            .length ===
-          1
+          subtitle
+        }
 
-            ? '1 lista'
+        songs={
+          songs
+        }
 
-            : `${playlists.playlists.length} listas`
+        emptyText=
+          "Esta playlist está vacía. Usa el menú de una canción para añadirla."
+
+        onRemoveSong={
+          playlist
+
+            ? songId =>
+                playlists
+                  .removeSong(
+                    playlist.id,
+                    songId
+                  )
+
+            : undefined
         }
       />
 
 
       {/* ===============================================
-          CREAR
+          BOTÓN REORDENAR
       =============================================== */}
 
-      <View
-        style={
-          styles.createRow
-        }
-      >
-        <TextInput
-          value={
-            name
-          }
-
-          onChangeText={
-            setName
-          }
-
-          placeholder=
-            "Nombre de nueva playlist"
-
-          placeholderTextColor={
-            COLORS.textMuted
-          }
-
-          style={
-            styles.input
-          }
-
-          selectionColor={
-            COLORS.purpleLight
-          }
-
-          returnKeyType=
-            "done"
-
-          onSubmitEditing={
-            create
-          }
-        />
-
-
+      {playlist &&
+      songs.length >
+        1 ? (
         <TouchableOpacity
-          style={[
-            styles.add,
-
-            !name.trim()
-            &&
-            styles.addDisabled,
-          ]}
+          style={
+            styles.reorderButton
+          }
           activeOpacity={
             0.78
           }
-          disabled={
-            !name.trim()
-          }
-          onPress={
-            create
+          onPress={() =>
+            setReorderOpen(
+              true
+            )
           }
         >
           <MaterialCommunityIcons
             name=
-              "plus"
+              "playlist-edit"
 
             size={
-              25
+              20
             }
 
             color={
               COLORS.white
             }
           />
+
+
+          <Text
+            style={
+              styles.reorderButtonText
+            }
+          >
+            Ordenar playlist
+          </Text>
         </TouchableOpacity>
-      </View>
+      ) : null}
 
 
       {/* ===============================================
-          LISTA
+          MODAL REORDENAR
       =============================================== */}
 
-      <FlatList
-        data={
-          playlists
-            .playlists
+      <Modal
+        visible={
+          reorderOpen
         }
 
-        keyExtractor={
-          item =>
-            item.id
-        }
+        transparent
 
-        contentContainerStyle={
-          styles.content
-        }
+        animationType=
+          "slide"
 
-        showsVerticalScrollIndicator={
-          false
-        }
+        statusBarTranslucent
 
-        ListEmptyComponent={
-          <View
+        onRequestClose={() =>
+          setReorderOpen(
+            false
+          )
+        }
+      >
+        <Pressable
+          style={
+            styles.backdrop
+          }
+
+          onPress={() =>
+            setReorderOpen(
+              false
+            )
+          }
+        >
+          <Pressable
             style={
-              styles.empty
+              styles.sheet
             }
+
+            onPress={() => {}}
           >
-            <MaterialCommunityIcons
-              name=
-                "playlist-music-outline"
-
-              size={
-                54
-              }
-
-              color={
-                COLORS.textMuted
-              }
-            />
-
-
-            <Text
+            <SafeAreaView
+              edges={[
+                'bottom',
+              ]}
               style={
-                styles.emptyTitle
+                styles.sheetSafe
               }
             >
-              Todavía no tienes playlists
-            </Text>
-
-
-            <Text
-              style={
-                styles.emptyText
-              }
-            >
-              Crea una para organizar tus canciones favoritas.
-            </Text>
-          </View>
-        }
-
-        renderItem={({
-          item,
-        }) => {
-          const totalDuration =
-            playlistDurations.get(
-              item.id
-            ) ??
-            0;
-
-
-          return (
-            <View
-              style={
-                styles.row
-              }
-            >
-              <TouchableOpacity
-                activeOpacity={
-                  0.75
-                }
-
+              <View
                 style={
-                  styles.rowMain
-                }
-
-                onPress={() =>
-                  navigateOnce(
-                    () =>
-                      router.push({
-                        pathname:
-                          '/playlist',
-
-                        params: {
-                          id:
-                            item.id,
-                        },
-                      })
-                  )
+                  styles.sheetHeader
                 }
               >
                 <View
                   style={
-                    styles.icon
+                    styles.sheetHeaderText
+                  }
+                >
+                  <Text
+                    style={
+                      styles.sheetTitle
+                    }
+                  >
+                    Ordenar playlist
+                  </Text>
+
+
+                  <Text
+                    style={
+                      styles.sheetSubtitle
+                    }
+                  >
+                    Cambia la posición de las canciones.
+                  </Text>
+                </View>
+
+
+                <TouchableOpacity
+                  style={
+                    styles.closeButton
+                  }
+                  activeOpacity={
+                    0.72
+                  }
+                  onPress={() =>
+                    setReorderOpen(
+                      false
+                    )
                   }
                 >
                   <MaterialCommunityIcons
                     name=
-                      "playlist-music"
+                      "close"
 
                     size={
-                      28
+                      22
                     }
 
                     color={
-                      COLORS.purpleLight
+                      COLORS.white
                     }
                   />
-                </View>
+                </TouchableOpacity>
+              </View>
 
 
-                <View
+              <ScrollView
+                style={
+                  styles.reorderList
+                }
+                contentContainerStyle={
+                  styles.reorderContent
+                }
+                showsVerticalScrollIndicator={
+                  false
+                }
+              >
+                {songs.map(
+                  (
+                    song,
+                    index
+                  ) => (
+                    <View
+                      key={
+                        song.id
+                      }
+                      style={
+                        styles.songRow
+                      }
+                    >
+                      <View
+                        style={
+                          styles.position
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.positionText
+                          }
+                        >
+                          {index + 1}
+                        </Text>
+                      </View>
+
+
+                      <View
+                        style={
+                          styles.songInfo
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.songTitle
+                          }
+                          numberOfLines={
+                            1
+                          }
+                        >
+                          {song.title}
+                        </Text>
+
+
+                        <Text
+                          style={
+                            styles.songArtist
+                          }
+                          numberOfLines={
+                            1
+                          }
+                        >
+                          {song.artist}
+                        </Text>
+                      </View>
+
+
+                      <TouchableOpacity
+                        style={[
+                          styles.moveButton,
+
+                          index ===
+                            0
+                          &&
+                          styles.moveButtonDisabled,
+                        ]}
+                        disabled={
+                          index ===
+                            0
+                        }
+                        activeOpacity={
+                          0.72
+                        }
+                        onPress={() => {
+                          if (
+                            !playlist
+                          ) {
+                            return;
+                          }
+
+
+                          playlists
+                            .moveSong(
+                              playlist.id,
+                              index,
+                              index - 1
+                            );
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name=
+                            "chevron-up"
+
+                          size={
+                            24
+                          }
+
+                          color={
+                            index ===
+                              0
+
+                              ? COLORS.textMuted
+
+                              : COLORS.white
+                          }
+                        />
+                      </TouchableOpacity>
+
+
+                      <TouchableOpacity
+                        style={[
+                          styles.moveButton,
+
+                          index ===
+                            songs.length -
+                              1
+                          &&
+                          styles.moveButtonDisabled,
+                        ]}
+                        disabled={
+                          index ===
+                            songs.length -
+                              1
+                        }
+                        activeOpacity={
+                          0.72
+                        }
+                        onPress={() => {
+                          if (
+                            !playlist
+                          ) {
+                            return;
+                          }
+
+
+                          playlists
+                            .moveSong(
+                              playlist.id,
+                              index,
+                              index + 1
+                            );
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name=
+                            "chevron-down"
+
+                          size={
+                            24
+                          }
+
+                          color={
+                            index ===
+                              songs.length -
+                                1
+
+                              ? COLORS.textMuted
+
+                              : COLORS.white
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )
+                )}
+              </ScrollView>
+
+
+              <TouchableOpacity
+                style={
+                  styles.doneButton
+                }
+                activeOpacity={
+                  0.8
+                }
+                onPress={() =>
+                  setReorderOpen(
+                    false
+                  )
+                }
+              >
+                <Text
                   style={
-                    styles.textArea
+                    styles.doneButtonText
                   }
                 >
-                  <Text
-                    style={
-                      styles.name
-                    }
-                    numberOfLines={
-                      1
-                    }
-                  >
-                    {item.name}
-                  </Text>
-
-
-                  <Text
-                    style={
-                      styles.count
-                    }
-                    numberOfLines={
-                      1
-                    }
-                  >
-                    {item.songIds.length ===
-                    1
-                      ? `1 canción · ${formatDuration(
-                          totalDuration
-                        )}`
-                      : `${item.songIds.length} canciones · ${formatDuration(
-                          totalDuration
-                        )}`}
-                  </Text>
-                </View>
+                  Listo
+                </Text>
               </TouchableOpacity>
-
-
-              <TouchableOpacity
-                style={
-                  styles.smallButton
-                }
-                activeOpacity={
-                  0.7
-                }
-                onPress={() =>
-                  setRenameTarget(
-                    item
-                  )
-                }
-              >
-                <MaterialCommunityIcons
-                  name=
-                    "pencil-outline"
-
-                  size={
-                    21
-                  }
-
-                  color={
-                    COLORS.textSecondary
-                  }
-                />
-              </TouchableOpacity>
-
-
-              <TouchableOpacity
-                style={
-                  styles.smallButton
-                }
-                activeOpacity={
-                  0.7
-                }
-                onPress={() =>
-                  Alert.alert(
-                    item.name,
-                    '¿Eliminar esta playlist?',
-                    [
-                      {
-                        text:
-                          'Cancelar',
-
-                        style:
-                          'cancel',
-                      },
-
-                      {
-                        text:
-                          'Eliminar',
-
-                        style:
-                          'destructive',
-
-                        onPress:
-                          () =>
-                            playlists
-                              .deletePlaylist(
-                                item.id
-                              ),
-                      },
-                    ]
-                  )
-                }
-              >
-                <MaterialCommunityIcons
-                  name=
-                    "trash-can-outline"
-
-                  size={
-                    21
-                  }
-
-                  color={
-                    COLORS.pink
-                  }
-                />
-              </TouchableOpacity>
-            </View>
-          );
-        }}
-      />
-
-
-      {/* ===============================================
-          RENOMBRAR
-      =============================================== */}
-
-      <RenamePlaylistModal
-        visible={
-          Boolean(
-            renameTarget
-          )
-        }
-
-        initialName={
-          renameTarget
-            ?.name ??
-          ''
-        }
-
-        onClose={() =>
-          setRenameTarget(
-            null
-          )
-        }
-
-        onSave={
-          newName => {
-            if (
-              !renameTarget
-            ) {
-              return;
-            }
-
-
-            const renamed =
-              playlists
-                .renamePlaylist(
-                  renameTarget.id,
-                  newName
-                );
-
-
-            if (
-              renamed ===
-                false
-            ) {
-              Alert.alert(
-                'No se pudo renombrar',
-                'Usa un nombre diferente para la playlist.'
-              );
-            }
-          }
-        }
-      />
-    </SafeAreaView>
+            </SafeAreaView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
 
@@ -651,112 +615,214 @@ const styles =
         1,
 
       backgroundColor:
-        COLORS.background,
+        'transparent',
     },
 
 
-    createRow: {
+    reorderButton: {
+      position:
+        'absolute',
+
+      right:
+        18,
+
+      bottom:
+        92,
+
+      minHeight:
+        46,
+
+      paddingHorizontal:
+        15,
+
+      borderRadius:
+        23,
+
       flexDirection:
         'row',
 
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
       gap:
-        10,
-
-      paddingHorizontal:
-        20,
-
-      marginBottom:
-        12,
-    },
-
-
-    input: {
-      flex:
-        1,
-
-      height:
-        49,
-
-      borderRadius:
-        16,
+        7,
 
       backgroundColor:
-        COLORS.surface,
-
-      color:
-        COLORS.white,
-
-      paddingHorizontal:
-        14,
+        COLORS.purple,
 
       borderWidth:
         StyleSheet.hairlineWidth,
 
       borderColor:
-        'rgba(255,255,255,0.08)',
+        'rgba(255,255,255,0.18)',
     },
 
 
-    add: {
-      width:
-        49,
+    reorderButtonText: {
+      color:
+        COLORS.white,
 
-      height:
-        49,
+      fontSize:
+        11,
 
-      borderRadius:
-        16,
+      fontWeight:
+        '700',
+    },
 
-      backgroundColor:
-        COLORS.purple,
+
+    backdrop: {
+      flex:
+        1,
 
       justifyContent:
-        'center',
+        'flex-end',
 
-      alignItems:
-        'center',
+      backgroundColor:
+        'rgba(0,0,0,0.64)',
     },
 
 
-    addDisabled: {
-      opacity:
-        0.45,
+    sheet: {
+      width:
+        '100%',
+
+      maxHeight:
+        '82%',
+
+      borderTopLeftRadius:
+        28,
+
+      borderTopRightRadius:
+        28,
+
+      overflow:
+        'hidden',
+
+      backgroundColor:
+        '#17171E',
+
+      borderWidth:
+        StyleSheet.hairlineWidth,
+
+      borderColor:
+        'rgba(255,255,255,0.10)',
     },
 
 
-    content: {
-      paddingHorizontal:
-        20,
-
-      paddingBottom:
-        120,
-
-      flexGrow:
-        1,
+    sheetSafe: {
+      maxHeight:
+        '100%',
     },
 
 
-    row: {
-      minHeight:
-        78,
-
+    sheetHeader: {
       flexDirection:
         'row',
 
       alignItems:
         'center',
+
+      paddingHorizontal:
+        20,
+
+      paddingTop:
+        19,
+
+      paddingBottom:
+        15,
+    },
+
+
+    sheetHeaderText: {
+      flex:
+        1,
+
+      paddingRight:
+        14,
+    },
+
+
+    sheetTitle: {
+      color:
+        COLORS.white,
+
+      fontSize:
+        21,
+
+      fontWeight:
+        '800',
+    },
+
+
+    sheetSubtitle: {
+      color:
+        COLORS.textSecondary,
+
+      fontSize:
+        11,
+
+      marginTop:
+        5,
+    },
+
+
+    closeButton: {
+      width:
+        42,
+
+      height:
+        42,
+
+      borderRadius:
+        21,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      backgroundColor:
+        'rgba(255,255,255,0.08)',
+    },
+
+
+    reorderList: {
+      flexGrow:
+        0,
+
+      borderTopWidth:
+        StyleSheet.hairlineWidth,
+
+      borderTopColor:
+        'rgba(255,255,255,0.08)',
 
       borderBottomWidth:
         StyleSheet.hairlineWidth,
 
       borderBottomColor:
-        'rgba(255,255,255,0.06)',
+        'rgba(255,255,255,0.08)',
     },
 
 
-    rowMain: {
-      flex:
-        1,
+    reorderContent: {
+      paddingHorizontal:
+        14,
+
+      paddingVertical:
+        10,
+    },
+
+
+    songRow: {
+      minHeight:
+        64,
+
+      borderRadius:
+        16,
 
       flexDirection:
         'row',
@@ -764,130 +830,160 @@ const styles =
       alignItems:
         'center',
 
-      gap:
-        13,
+      paddingHorizontal:
+        10,
 
-      minWidth:
-        0,
+      marginVertical:
+        3,
+
+      backgroundColor:
+        'rgba(255,255,255,0.045)',
+
+      borderWidth:
+        StyleSheet.hairlineWidth,
+
+      borderColor:
+        'rgba(255,255,255,0.07)',
     },
 
 
-    icon: {
+    position: {
       width:
-        55,
+        30,
 
       height:
-        55,
+        30,
 
       borderRadius:
-        17,
+        10,
 
-      backgroundColor:
-        COLORS.surface,
+      alignItems:
+        'center',
 
       justifyContent:
         'center',
 
-      alignItems:
-        'center',
+      marginRight:
+        10,
+
+      backgroundColor:
+        'rgba(139,92,246,0.14)',
     },
 
 
-    textArea: {
+    positionText: {
+      color:
+        COLORS.purpleLight,
+
+      fontSize:
+        11,
+
+      fontWeight:
+        '800',
+    },
+
+
+    songInfo: {
       flex:
         1,
 
       minWidth:
         0,
+
+      paddingRight:
+        7,
     },
 
 
-    name: {
+    songTitle: {
       color:
         COLORS.white,
 
       fontSize:
-        15,
+        13,
 
       fontWeight:
         '600',
     },
 
 
-    count: {
+    songArtist: {
       color:
         COLORS.textMuted,
 
       fontSize:
-        11,
+        10,
 
       marginTop:
         4,
     },
 
 
-    smallButton: {
+    moveButton: {
       width:
         38,
 
       height:
         42,
 
-      justifyContent:
-        'center',
-
-      alignItems:
-        'center',
-    },
-
-
-    empty: {
-      flex:
-        1,
-
-      justifyContent:
-        'center',
+      borderRadius:
+        12,
 
       alignItems:
         'center',
 
-      minHeight:
-        300,
+      justifyContent:
+        'center',
 
-      paddingHorizontal:
-        30,
+      backgroundColor:
+        'rgba(255,255,255,0.055)',
+
+      marginLeft:
+        4,
     },
 
 
-    emptyTitle: {
+    moveButtonDisabled: {
+      opacity:
+        0.45,
+    },
+
+
+    doneButton: {
+      height:
+        50,
+
+      marginHorizontal:
+        20,
+
+      marginTop:
+        14,
+
+      marginBottom:
+        8,
+
+      borderRadius:
+        16,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      backgroundColor:
+        COLORS.purple,
+    },
+
+
+    doneButtonText: {
       color:
         COLORS.white,
 
       fontSize:
-        15,
+        13,
 
       fontWeight:
-        '700',
-
-      marginTop:
-        14,
-    },
-
-
-    emptyText: {
-      color:
-        COLORS.textMuted,
-
-      fontSize:
-        12,
-
-      lineHeight:
-        18,
-
-      textAlign:
-        'center',
-
-      marginTop:
-        7,
+        '800',
     },
   });

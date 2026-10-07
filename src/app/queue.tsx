@@ -23,6 +23,9 @@ import {
 import Artwork
   from '../components/Artwork';
 
+import HomeBackground
+  from '../components/HomeBackground';
+
 import ScreenHeader
   from '../components/ScreenHeader';
 
@@ -447,11 +450,29 @@ export default function QueueScreen() {
 
 
   return (
-    <SafeAreaView
+    <View
       style={
-        styles.container
+        styles.screen
       }
     >
+      <HomeBackground
+        artwork={
+          player.currentSong
+            ?.artwork
+        }
+
+        seed={
+          player.currentSong
+            ?.id
+        }
+      />
+
+
+      <SafeAreaView
+        style={
+          styles.container
+        }
+      >
       <ScreenHeader
         title=
           "Cola"
@@ -608,19 +629,29 @@ export default function QueueScreen() {
           7
         }
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 
 const styles =
   StyleSheet.create({
+    screen: {
+      flex:
+        1,
+
+      backgroundColor:
+        '#090811',
+    },
+
+
     container: {
       flex:
         1,
 
       backgroundColor:
-        COLORS.background,
+        'transparent',
     },
 
 

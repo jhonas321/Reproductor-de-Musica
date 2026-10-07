@@ -354,6 +354,69 @@ export default function HomeScreen() {
 
 
   /* =======================================================
+     VOLVER ARRIBA
+  ======================================================= */
+
+  const listRef =
+    useRef<
+      FlatList<Song>
+    >(null);
+
+
+  const [
+    showScrollTop,
+    setShowScrollTop,
+  ] =
+    useState(
+      false
+    );
+
+
+  const handleListScroll =
+    useCallback(
+      (
+        event:
+          any
+      ) => {
+        const offsetY =
+          event
+            .nativeEvent
+            .contentOffset
+            .y;
+
+
+        const shouldShow =
+          offsetY >
+          500;
+
+
+        setShowScrollTop(
+          current =>
+            current ===
+              shouldShow
+              ? current
+              : shouldShow
+        );
+      },
+      []
+    );
+
+
+  const scrollToTop =
+    useCallback(
+      () => {
+        listRef.current
+          ?.scrollToOffset({
+            offset: 0,
+
+            animated: true,
+          });
+      },
+      []
+    );
+
+
+  /* =======================================================
      FILTRO FAVORITOS
   ======================================================= */
 
@@ -1962,6 +2025,10 @@ export default function HomeScreen() {
       =============================================== */}
 
       <FlatList
+        ref={
+          listRef
+        }
+
         data={
           displayedSongs
         }
@@ -1993,6 +2060,14 @@ export default function HomeScreen() {
 
         showsVerticalScrollIndicator={
           false
+        }
+
+        onScroll={
+          handleListScroll
+        }
+
+        scrollEventThrottle={
+          32
         }
 
         keyboardShouldPersistTaps=
@@ -2041,6 +2116,32 @@ export default function HomeScreen() {
           />
         }
       />
+
+
+      {showScrollTop &&
+      !selectionMode ? (
+        <TouchableOpacity
+          style={
+            styles.scrollTopButton
+          }
+
+          activeOpacity={
+            0.82
+          }
+
+          onPress={
+            scrollToTop
+          }
+        >
+          <MaterialCommunityIcons
+            name="arrow-up"
+            size={24}
+            color={
+              COLORS.white
+            }
+          />
+        </TouchableOpacity>
+      ) : null}
 
 
       {/* ===============================================
@@ -2343,6 +2444,63 @@ const styles =
 
       flexGrow:
         1,
+    },
+
+
+    scrollTopButton: {
+      position:
+        'absolute',
+
+      right:
+        18,
+
+      bottom:
+        122,
+
+      width:
+        48,
+
+      height:
+        48,
+
+      borderRadius:
+        24,
+
+      backgroundColor:
+        'rgba(70, 50, 100, 0.92)',
+
+      borderWidth:
+        StyleSheet.hairlineWidth,
+
+      borderColor:
+        'rgba(255,255,255,0.18)',
+
+      justifyContent:
+        'center',
+
+      alignItems:
+        'center',
+
+      zIndex:
+        999,
+
+      elevation:
+        20,
+
+      shadowColor:
+        '#000',
+
+      shadowOpacity:
+        0.28,
+
+      shadowRadius:
+        8,
+
+      shadowOffset: {
+        width: 0,
+
+        height: 4,
+      },
     },
 
 

@@ -47,23 +47,19 @@ import {
   shareMultipleSongFiles,
 } from '../services/androidMediaActions';
 
-import Artwork
-  from './Artwork';
+import Artwork from './Artwork';
 
-import AddToPlaylistModal
-  from './AddToPlaylistModal';
+import AddToPlaylistModal from './AddToPlaylistModal';
 
-import ScreenHeader
-  from './ScreenHeader';
+import ScreenHeader from './ScreenHeader';
 
-import SongItem
-  from './SongItem';
+import HomeBackground from './HomeBackground';
 
-import SongMenuModal
-  from './SongMenuModal';
+import SongItem from './SongItem';
 
-import TrackInfoModal
-  from './TrackInfoModal';
+import SongMenuModal from './SongMenuModal';
+
+import TrackInfoModal from './TrackInfoModal';
 
 
 interface Props {
@@ -927,12 +923,45 @@ export default function SongCollectionScreen({
      INTERFAZ
   ========================================================= */
 
+  const backgroundArtwork =
+    player.currentSong
+      ?.artwork ??
+    artwork ??
+    songs[0]
+      ?.artwork ??
+    null;
+
+
+  const backgroundSeed =
+    player.currentSong
+      ?.id ??
+    songs[0]
+      ?.id ??
+    title;
+
+
   return (
-    <SafeAreaView
+    <View
       style={
-        styles.container
+        styles.screen
       }
     >
+      <HomeBackground
+        artwork={
+          backgroundArtwork
+        }
+
+        seed={
+          backgroundSeed
+        }
+      />
+
+
+      <SafeAreaView
+        style={
+          styles.container
+        }
+      >
       {/* =====================================
           CABECERA
       ===================================== */}
@@ -1487,18 +1516,27 @@ export default function SongCollectionScreen({
           )
         }
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 
 const styles =
   StyleSheet.create({
+    screen: {
+      flex: 1,
+
+      backgroundColor:
+        '#090811',
+    },
+
+
     container: {
       flex: 1,
 
       backgroundColor:
-        COLORS.background,
+        'transparent',
     },
 
 

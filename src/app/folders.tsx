@@ -38,6 +38,9 @@ import {
   getSongFolderPath,
 } from '../utils/music';
 
+import HomeBackground
+  from '../components/HomeBackground';
+
 import ScreenHeader
   from '../components/ScreenHeader';
 
@@ -58,6 +61,7 @@ interface RootFolder {
 export default function FoldersScreen() {
   const {
     library,
+    player,
   } =
     useApp();
 
@@ -220,191 +224,235 @@ export default function FoldersScreen() {
 
 
   return (
-    <SafeAreaView
+    <View
       style={
-        styles.container
+        styles.screen
       }
     >
-      <ScreenHeader
-        title="Carpetas"
-        subtitle={`${folders.length} carpetas principales`}
+      <HomeBackground
+        artwork={
+          player.currentSong
+            ?.artwork
+        }
+
+        seed={
+          player.currentSong
+            ?.id
+        }
       />
 
 
-      <FlatList
-        data={
-          folders
+      <SafeAreaView
+        style={
+          styles.container
         }
-        keyExtractor={
-          item =>
-            item.path
-        }
-        contentContainerStyle={
-          styles.content
-        }
-        showsVerticalScrollIndicator={
-          false
-        }
-        removeClippedSubviews
-        initialNumToRender={
-          12
-        }
-        maxToRenderPerBatch={
-          10
-        }
-        windowSize={
-          6
-        }
-        ListEmptyComponent={
-          <View
-            style={
-              styles.empty
-            }
-          >
-            <MaterialCommunityIcons
-              name="folder-music-outline"
-              size={55}
-              color={
-                COLORS.textMuted
-              }
-            />
+      >
+        <ScreenHeader
+          title="Carpetas"
+          subtitle={`${folders.length} carpetas principales`}
+        />
 
-            <Text
-              style={
-                styles.emptyTitle
-              }
-            >
-              No hay carpetas
-            </Text>
 
-            <Text
-              style={
-                styles.emptyText
-              }
-            >
-              Android todavía no ha proporcionado información de ubicación para tu música.
-            </Text>
-          </View>
-        }
-        renderItem={({
-          item,
-        }) => (
-          <TouchableOpacity
-            activeOpacity={
-              0.75
-            }
-            style={
-              styles.folder
-            }
-            onPress={() =>
-              navigateOnce(
-                () =>
-                  router.push({
-                    pathname:
-                      '/folder',
+        <FlatList
+          data={
+            folders
+          }
 
-                    params: {
-                      path:
-                        item.path,
+          keyExtractor={
+            item =>
+              item.path
+          }
 
-                      name:
-                        item.name,
-                    },
-                  })
-              )
-            }
-          >
+          contentContainerStyle={
+            styles.content
+          }
+
+          showsVerticalScrollIndicator={
+            false
+          }
+
+          removeClippedSubviews
+
+          initialNumToRender={
+            12
+          }
+
+          maxToRenderPerBatch={
+            10
+          }
+
+          windowSize={
+            6
+          }
+
+          ListEmptyComponent={
             <View
               style={
-                styles.icon
+                styles.empty
               }
             >
               <MaterialCommunityIcons
-                name={
-                  item.name ===
-                  'Otros'
-                    ? 'folder-question-outline'
-                    : 'folder-music'
-                }
-                size={30}
+                name="folder-music-outline"
+                size={55}
                 color={
-                  item.name ===
-                  'Otros'
-                    ? COLORS.orange
-                    : COLORS.green
+                  COLORS.textMuted
                 }
               />
+
+
+              <Text
+                style={
+                  styles.emptyTitle
+                }
+              >
+                No hay carpetas
+              </Text>
+
+
+              <Text
+                style={
+                  styles.emptyText
+                }
+              >
+                Android todavía no ha proporcionado información de ubicación para tu música.
+              </Text>
             </View>
+          }
 
+          renderItem={({
+            item,
+          }) => (
+            <TouchableOpacity
+              activeOpacity={
+                0.75
+              }
 
-            <View
               style={
-                styles.info
+                styles.folder
+              }
+
+              onPress={() =>
+                navigateOnce(
+                  () =>
+                    router.push({
+                      pathname:
+                        '/folder',
+
+                      params: {
+                        path:
+                          item.path,
+
+                        name:
+                          item.name,
+                      },
+                    })
+                )
               }
             >
-              <Text
+              <View
                 style={
-                  styles.name
+                  styles.icon
                 }
-                numberOfLines={1}
               >
-                {item.name}
-              </Text>
+                <MaterialCommunityIcons
+                  name={
+                    item.name ===
+                    'Otros'
+                      ? 'folder-question-outline'
+                      : 'folder-music'
+                  }
+
+                  size={30}
+
+                  color={
+                    item.name ===
+                    'Otros'
+                      ? COLORS.orange
+                      : COLORS.green
+                  }
+                />
+              </View>
 
 
-              <Text
+              <View
                 style={
-                  styles.subtitle
+                  styles.info
                 }
-                numberOfLines={1}
               >
-                {item.songCount} canciones
-
-                {item.subfolderCount >
-                  0
-                  ? ` • ${item.subfolderCount} subcarpetas`
-                  : ''
-                }
-              </Text>
-
-
-              {item.directSongCount >
-                0 &&
-              item.subfolderCount >
-                0 ? (
                 <Text
                   style={
-                    styles.directCount
+                    styles.name
                   }
+
+                  numberOfLines={1}
                 >
-                  {item.directSongCount} directamente en esta carpeta
+                  {item.name}
                 </Text>
-              ) : null}
-            </View>
 
 
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={27}
-              color={
-                COLORS.textMuted
-              }
-            />
-          </TouchableOpacity>
-        )}
-      />
-    </SafeAreaView>
+                <Text
+                  style={
+                    styles.subtitle
+                  }
+
+                  numberOfLines={1}
+                >
+                  {item.songCount} canciones
+
+                  {item.subfolderCount >
+                    0
+                    ? ` • ${item.subfolderCount} subcarpetas`
+                    : ''
+                  }
+                </Text>
+
+
+                {item.directSongCount >
+                  0 &&
+                item.subfolderCount >
+                  0 ? (
+                  <Text
+                    style={
+                      styles.directCount
+                    }
+                  >
+                    {item.directSongCount} directamente en esta carpeta
+                  </Text>
+                ) : null}
+              </View>
+
+
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={27}
+                color={
+                  COLORS.textMuted
+                }
+              />
+            </TouchableOpacity>
+          )}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
 
 const styles =
   StyleSheet.create({
+    screen: {
+      flex: 1,
+
+      backgroundColor:
+        '#090811',
+    },
+
+
     container: {
       flex: 1,
 
       backgroundColor:
-        COLORS.background,
+        'transparent',
     },
 
 

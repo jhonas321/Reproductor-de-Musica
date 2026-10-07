@@ -30,6 +30,9 @@ import {
   COLORS,
 } from "../constants/colors";
 
+import HomeBackground
+  from "../components/HomeBackground";
+
 import ScreenHeader
   from "../components/ScreenHeader";
 
@@ -68,6 +71,7 @@ export default function SettingsScreen() {
     library,
     settings,
     stats,
+    player,
   } =
     useApp();
 
@@ -159,11 +163,29 @@ export default function SettingsScreen() {
 
 
   return (
-    <SafeAreaView
+    <View
       style={
-        styles.container
+        styles.screen
       }
     >
+      <HomeBackground
+        artwork={
+          player.currentSong
+            ?.artwork
+        }
+
+        seed={
+          player.currentSong
+            ?.id
+        }
+      />
+
+
+      <SafeAreaView
+        style={
+          styles.container
+        }
+      >
       <ScreenHeader
         title=
           "Configuración"
@@ -893,7 +915,8 @@ export default function SettingsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -904,12 +927,21 @@ export default function SettingsScreen() {
 
 const styles =
   StyleSheet.create({
+    screen: {
+      flex:
+        1,
+
+      backgroundColor:
+        "#090811",
+    },
+
+
     container: {
       flex:
         1,
 
       backgroundColor:
-        COLORS.background,
+        "transparent",
     },
 
 

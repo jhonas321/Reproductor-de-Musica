@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  Animated,
+  Easing,
   Image,
   Modal,
   Pressable,
@@ -25,8 +27,11 @@ import { getArtworkTheme } from "../utils/artworkTheme";
 import type { RepeatMode, Song } from "../types/Song";
 
 import Artwork from "./Artwork";
+
 import EqualizerModal from "./EqualizerModal";
+
 import LyricsModal from "./LyricsModal";
+
 import ProgressBar from "./ProgressBar";
 
 interface Props {
@@ -77,9 +82,13 @@ interface FooterActionProps {
 
 function FooterAction({
   icon,
+
   label,
+
   active = false,
+
   compact = false,
+
   onPress,
 }: FooterActionProps) {
   return (
@@ -120,6 +129,167 @@ function FooterAction({
   );
 }
 
+/* =========================================================
+   TÍTULO CON MARQUEE
+
+   - Siempre ocupa una sola línea.
+   - Si cabe, permanece quieto.
+   - Si es largo, se desplaza horizontalmente.
+   - Nunca empuja artista, álbum, progreso ni botones.
+========================================================= */
+
+interface MarqueeTitleProps {
+  text: string;
+
+  fontSize: number;
+
+  lineHeight: number;
+}
+
+function MarqueeTitle({ text, fontSize, lineHeight }: MarqueeTitleProps) {
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const [viewportWidth, setViewportWidth] = useState(0);
+
+  const [contentWidth, setContentWidth] = useState(0);
+
+  const overflow = Math.max(0, contentWidth - viewportWidth);
+
+  const shouldScroll = viewportWidth > 0 && overflow > 8;
+
+  useEffect(() => {
+    translateX.stopAnimation();
+    translateX.setValue(0);
+
+    if (!shouldScroll) {
+      return;
+    }
+
+    const distance = overflow + 22;
+
+    const forwardDuration = Math.max(3200, Math.round(distance * 34));
+
+    const returnDuration = Math.max(900, Math.round(forwardDuration * 0.32));
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.delay(900),
+
+        Animated.timing(translateX, {
+          toValue: -distance,
+
+          duration: forwardDuration,
+
+          easing: Easing.linear,
+
+          useNativeDriver: true,
+        }),
+
+        Animated.delay(900),
+
+        Animated.timing(translateX, {
+          toValue: 0,
+
+          duration: returnDuration,
+
+          easing: Easing.out(Easing.quad),
+
+          useNativeDriver: true,
+        }),
+
+        Animated.delay(700),
+      ])
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+
+      translateX.stopAnimation();
+
+      translateX.setValue(0);
+    };
+  }, [overflow, shouldScroll, text, translateX]);
+
+  return (
+    <View
+      style={[
+        styles.titleViewport,
+
+        {
+          height: lineHeight,
+        },
+      ]}
+      onLayout={(event) => {
+        const nextWidth = Math.round(event.nativeEvent.layout.width);
+
+        if (nextWidth > 0 && nextWidth !== viewportWidth) {
+          setViewportWidth(nextWidth);
+        }
+      }}
+    >
+      {/* Medimos de forma invisible el ancho real del título */}
+      <Text
+        pointerEvents="none"
+        style={[
+          styles.title,
+
+          styles.titleMeasure,
+
+          {
+            fontSize,
+
+            lineHeight,
+          },
+        ]}
+        numberOfLines={1}
+        onTextLayout={(event) => {
+          const measured = event.nativeEvent.lines?.[0]?.width ?? 0;
+
+          const nextWidth = Math.ceil(measured);
+
+          if (nextWidth > 0 && nextWidth !== contentWidth) {
+            setContentWidth(nextWidth);
+          }
+        }}
+      >
+        {text}
+      </Text>
+
+      <Animated.Text
+        style={[
+          styles.title,
+
+          styles.titleMoving,
+
+          {
+            fontSize,
+
+            lineHeight,
+          },
+
+          shouldScroll
+            ? {
+                width: contentWidth + 2,
+
+                transform: [
+                  {
+                    translateX,
+                  },
+                ],
+              }
+            : styles.titleStatic,
+        ]}
+        numberOfLines={1}
+        ellipsizeMode={shouldScroll ? "clip" : "tail"}
+      >
+        {text}
+      </Animated.Text>
+    </View>
+  );
+}
+
 interface PlayerProgressConnectedProps {
   onSeek: (seconds: number) => void;
 }
@@ -146,7 +316,9 @@ interface LyricsModalConnectedProps {
 
 function LyricsModalConnected({
   visible,
+
   song,
+
   onClose,
 }: LyricsModalConnectedProps) {
   const { currentTime } = usePlayerProgress();
@@ -163,20 +335,35 @@ function LyricsModalConnected({
 
 function PlayerModal({
   visible,
+
   song,
+
   playing,
+
   shuffle,
+
   repeatMode,
+
   favorite,
+
   onClose,
+
   onPrevious,
+
   onPlayPause,
+
   onNext,
+
   onShuffle,
+
   onRepeat,
+
   onFavorite,
+
   onSeek,
+
   onQueue,
+
   onSleepTimer,
 }: Props) {
   const { width, height } = useWindowDimensions();
@@ -188,17 +375,29 @@ function PlayerModal({
   const [equalizerOpen, setEqualizerOpen] = useState(false);
 
   /*
+
    * =====================================================
+
    * RESPONSIVE
+
    * =====================================================
+
    *
+
    * Ya no dependemos de tamaños gigantes fijos.
+
    *
+
    * Tenemos tres escenarios:
+
    *
+
    * 1. Pantalla pequeña
+
    * 2. Pantalla normal
+
    * 3. Pantalla grande
+
    */
 
   const veryNarrow = width < 360;
@@ -210,11 +409,17 @@ function PlayerModal({
   const veryShortScreen = height < 680;
 
   /*
+
    * La portada depende tanto del ancho como
+
    * de la altura disponible.
+
    *
+
    * Esto evita que en teléfonos altos o angostos
+
    * la portada empuje los controles fuera.
+
    */
 
   const horizontalSpace = veryNarrow ? 22 : narrow ? 26 : 30;
@@ -240,7 +445,9 @@ function PlayerModal({
   const artworkIconSize = Math.round(artworkSize * 0.3);
 
   /*
+
    * Tamaños de botones.
+
    */
 
   const playButtonSize = veryNarrow ? 62 : shortScreen ? 66 : 70;
@@ -252,7 +459,9 @@ function PlayerModal({
   const skipIconSize = narrow ? 34 : 38;
 
   /*
+
    * Textos.
+
    */
 
   const titleFontSize = veryNarrow ? 19 : narrow ? 20 : 22;
@@ -272,9 +481,13 @@ function PlayerModal({
   }, [song.id]);
 
   /*
+
    * =====================================================
+
    * FONDO DINÁMICO
+
    * =====================================================
+
    */
 
   const [failedBackgroundUri, setFailedBackgroundUri] = useState<string | null>(
@@ -306,6 +519,7 @@ function PlayerModal({
     (playlistId: string) => {
       playlists.addSong(playlistId, song.id);
     },
+
     [playlists, song.id]
   );
 
@@ -319,7 +533,9 @@ function PlayerModal({
       >
         <View style={styles.container}>
           {/* =========================
+
               FONDO
+
           ========================= */}
 
           {!hasRealBackground ? (
@@ -404,7 +620,9 @@ function PlayerModal({
             ]}
           >
             {/* =========================
+
                 CABECERA
+
             ========================= */}
 
             <View
@@ -474,7 +692,9 @@ function PlayerModal({
             </View>
 
             {/* =========================
+
                 CONTENIDO PRINCIPAL
+
             ========================= */}
 
             <View
@@ -487,7 +707,9 @@ function PlayerModal({
               ]}
             >
               {/* =======================
+
                   CARÁTULA
+
               ======================= */}
 
               <View
@@ -526,7 +748,9 @@ function PlayerModal({
               </View>
 
               {/* =======================
+
                   INFORMACIÓN
+
               ======================= */}
 
               <View
@@ -536,25 +760,15 @@ function PlayerModal({
                   {
                     paddingHorizontal: narrow ? 8 : 12,
 
-                    minHeight: shortScreen ? 68 : 74,
+                    height: shortScreen ? 68 : 74,
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.title,
-
-                    {
-                      fontSize: titleFontSize,
-
-                      lineHeight: titleLineHeight,
-                    },
-                  ]}
-                  numberOfLines={2}
-                  ellipsizeMode="tail"
-                >
-                  {song.title}
-                </Text>
+                <MarqueeTitle
+                  text={song.title}
+                  fontSize={titleFontSize}
+                  lineHeight={titleLineHeight}
+                />
 
                 <Text
                   style={[
@@ -598,7 +812,9 @@ function PlayerModal({
               </View>
 
               {/* =======================
+
                   PROGRESO
+
               ======================= */}
 
               <View
@@ -616,7 +832,9 @@ function PlayerModal({
               </View>
 
               {/* =======================
+
                   CONTROLES
+
               ======================= */}
 
               <View
@@ -773,7 +991,9 @@ function PlayerModal({
             </View>
 
             {/* =========================
+
                 FOOTER
+
             ========================= */}
 
             <View
@@ -828,7 +1048,9 @@ function PlayerModal({
             </View>
 
             {/* =========================
+
                 AGREGAR A PLAYLIST
+
             ========================= */}
 
             {playlistOpen ? (
@@ -987,17 +1209,24 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * FONDO
+
    * =====================================================
+
    */
 
   generatedBackground: {
     position: "absolute",
 
     top: 0,
+
     left: 0,
+
     right: 0,
+
     bottom: 0,
   },
 
@@ -1005,8 +1234,11 @@ const styles = StyleSheet.create({
     position: "absolute",
 
     top: 0,
+
     left: 0,
+
     right: 0,
+
     bottom: 0,
 
     backgroundColor: "#09090F",
@@ -1093,9 +1325,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * HEADER
+
    * =====================================================
+
    */
 
   topBar: {
@@ -1171,9 +1407,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * CONTENIDO
+
    * =====================================================
+
    */
 
   mainContent: {
@@ -1187,9 +1427,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * CARÁTULA
+
    * =====================================================
+
    */
 
   artworkStage: {
@@ -1215,13 +1459,19 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * INFORMACIÓN
+
    * =====================================================
+
    */
 
   songInfo: {
     flexShrink: 0,
+
+    overflow: "hidden",
   },
 
   title: {
@@ -1230,6 +1480,38 @@ const styles = StyleSheet.create({
     fontWeight: "700",
 
     letterSpacing: -0.25,
+  },
+
+  titleViewport: {
+    width: "100%",
+
+    overflow: "hidden",
+
+    position: "relative",
+
+    justifyContent: "center",
+  },
+
+  titleMeasure: {
+    position: "absolute",
+
+    left: 0,
+
+    top: 0,
+
+    width: 5000,
+
+    opacity: 0,
+  },
+
+  titleMoving: {
+    alignSelf: "flex-start",
+
+    flexShrink: 0,
+  },
+
+  titleStatic: {
+    width: "100%",
   },
 
   artist: {
@@ -1259,9 +1541,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * PROGRESO
+
    * =====================================================
+
    */
 
   progressArea: {
@@ -1271,9 +1557,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * CONTROLES
+
    * =====================================================
+
    */
 
   controls: {
@@ -1341,9 +1631,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * FOOTER
+
    * =====================================================
+
    */
 
   footer: {
@@ -1423,9 +1717,13 @@ const styles = StyleSheet.create({
   },
 
   /*
+
    * =====================================================
+
    * PLAYLIST SHEET
+
    * =====================================================
+
    */
 
   playlistOverlay: {

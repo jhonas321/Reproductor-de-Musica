@@ -1,68 +1,130 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# =========================================================
+# DEPENDENCIAS
+# =========================================================
 
-# dependencies
 node_modules/
 
-# Expo
+
+# =========================================================
+# EXPO
+# =========================================================
+
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+
+# =========================================================
+# NATIVO / ANDROID / IOS
+# =========================================================
+
+# Android sí se versiona
+/ios
+
+# Archivos locales de Android
+android/local.properties
+local.properties
+
+# Cachés y compilaciones nativas
 .kotlin/
+**/.gradle/
+**/.cxx/
+**/build/
+
+# Backups temporales
 *.orig.*
+
+# Claves y certificados
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
 
-# Metro
+
+# =========================================================
+# BUILDS GENERADOS
+# =========================================================
+
+*.apk
+*.aab
+
+
+# =========================================================
+# METRO
+# =========================================================
+
 .metro-health-check*
 
-# debug
+
+# =========================================================
+# LOGS / DEBUG
+# =========================================================
+
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
-# macOS
-.DS_Store
-*.pem
 
-# local env files
-.env*.local
+# =========================================================
+# TYPESCRIPT
+# =========================================================
 
-# typescript
 *.tsbuildinfo
 
-example
 
-# generated native folders
-/ios
-/android
+# =========================================================
+# VARIABLES DE ENTORNO
+# =========================================================
 
-
-# AI tools
-CLAUDE.md
-AGENTS.md
-.claude/
-.cursor/
-.cursorignore
-.github/copilot-instructions.md
-
-# Environment variables
 .env
+.env*.local
 
 
-# Builds generados
-**/build/
-**/.gradle/
+# =========================================================
+# SISTEMA OPERATIVO
+# =========================================================
 
-# IA
+.DS_Store
+Thumbs.db
+
+
+# =========================================================
+# EDITORES / IDE
+# =========================================================
+
+.vscode/
+.idea/
+
+
+# =========================================================
+# HERRAMIENTAS DE IA
+# =========================================================
+
 CLAUDE.md
 AGENTS.md
+
 .claude/
 .cursor/
 .cursorignore
+
 .github/copilot-instructions.md
+
+.copilot/
+.windsurf/
+.codeium/
+.continue/
+.aider/
+.roo/
+.cline/
+
+*.aider*
+*.codeium*
+*.copilot*
+*.cursor*
+*.claude*
+*.windsurf*

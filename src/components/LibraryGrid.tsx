@@ -1,752 +1,1443 @@
-import {
-  MaterialCommunityIcons,
-} from '@expo/vector-icons';
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+
+
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
 
 
 /* =========================================================
+
+
+
    PROPS
-========================================================= */
+
+
+
+\\========================================================= */
+
+
 
 interface Props {
-  songCount:
-    number;
 
-  albumCount:
-    number;
+  songCount: number;
 
-  artistCount:
-    number;
 
-  playlistCount:
-    number;
 
-  favoriteCount:
-    number;
+  albumCount: number;
 
-  recentCount:
-    number;
 
-  favoritesOnly:
-    boolean;
 
-  onSongsPress:
-    () => void;
+  artistCount: number;
 
-  onAlbumsPress:
-    () => void;
 
-  onArtistsPress:
-    () => void;
 
-  onFoldersPress:
-    () => void;
+  playlistCount: number;
 
-  onPlaylistsPress:
-    () => void;
 
-  onFavoritesPress:
-    () => void;
 
-  onRecentPress:
-    () => void;
+  favoriteCount: number;
 
-  onTopPress:
-    () => void;
+
+
+  recentCount: number;
+
+
+
+  favoritesOnly: boolean;
+
+
+
+  onSongsPress: () => void;
+
+
+
+  onAlbumsPress: () => void;
+
+
+
+  onArtistsPress: () => void;
+
+
+
+  onFoldersPress: () => void;
+
+
+
+  onPlaylistsPress: () => void;
+
+
+
+  onFavoritesPress: () => void;
+
+
+
+  onRecentPress: () => void;
+
+
+
+  onTopPress: () => void;
+
 }
+
 
 
 /* =========================================================
-   TEMA DE TARJETA
-========================================================= */
 
-interface CardTheme {
-  background:
-    string;
 
-  glow:
-    string;
 
-  glowSecondary:
-    string;
+   TIPOS
 
-  iconBackground:
-    string;
 
-  iconColor:
-    string;
 
-  border:
-    string;
+\\========================================================= */
+
+
+
+type CardSize = "hero" | "large" | "small" | "normal" | "wide";
+
+
+
+interface BentoCardProps {
+
+  title: string;
+
+
+
+  subtitle: string;
+
+
+
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+
+
+
+  size?: CardSize;
+
+
+
+  active?: boolean;
+
+
+
+  tint: string;
+
+
+
+  activeTint?: string;
+
+
+
+  onPress: () => void;
+
 }
+
 
 
 /* =========================================================
-   CARD
-========================================================= */
-
-interface LibraryCardProps {
-  title:
-    string;
-
-  subtitle:
-    string;
-
-  icon:
-    keyof typeof MaterialCommunityIcons.glyphMap;
-
-  theme:
-    CardTheme;
-
-  active?:
-    boolean;
-
-  onPress:
-    () => void;
-}
 
 
-function LibraryCard({
+
+   TARJETA BENTO
+
+
+
+\\========================================================= */
+
+
+
+function BentoCard({
+
   title,
+
+
+
   subtitle,
+
+
+
   icon,
-  theme,
+
+
+
+  size = "normal",
+
+
+
   active = false,
+
+
+
+  tint,
+
+
+
+  activeTint,
+
+
+
   onPress,
-}: LibraryCardProps) {
+
+}: BentoCardProps) {
+
+  const isHero = size === "hero";
+
+
+
+  const isLarge = size === "large";
+
+
+
+  const isSmall = size === "small";
+
+
+
+  const isWide = size === "wide";
+
+
+
   return (
+
     <TouchableOpacity
-      activeOpacity={0.82}
+
+      activeOpacity={0.84}
+
       onPress={onPress}
+
       style={[
+
         styles.card,
 
-        {
-          backgroundColor:
-            theme.background,
 
-          borderColor:
-            active
-              ? theme.border
-              : 'rgba(255,255,255,0.07)',
-        },
+
+        isHero && styles.heroCard,
+
+
+
+        isLarge && styles.largeCard,
+
+
+
+        isSmall && styles.smallCard,
+
+
+
+        isWide && styles.wideCard,
+
+
+
+        active && styles.activeCard,
+
       ]}
+
     >
-      {/* ===============================================
-          DECORACIÓN
-      =============================================== */}
+
+      {/* FONDO DE COLOR TIPO BLUR */}
 
       <View
+
+        pointerEvents="none"
+
         style={[
-          styles.glow,
+
+          styles.colorBackdrop,
+
+
+
           {
-            backgroundColor:
-              theme.glow,
+
+            backgroundColor: active && activeTint ? activeTint : tint,
+
           },
+
         ]}
+
       />
 
 
+
+      {/* CAPA DE PROFUNDIDAD */}
+
+      <View pointerEvents="none" style={styles.colorDepth} />
+
+
+
+      {/* REFLEJO SUPERIOR */}
+
+
+
+      <View pointerEvents="none" style={styles.cardReflection} />
+
+
+
+      {/* ICONO */}
+
+
+
       <View
+
         style={[
-          styles.glowSecondary,
-          {
-            backgroundColor:
-              theme.glowSecondary,
-          },
+
+          styles.iconBox,
+
+
+
+          isHero && styles.heroIconBox,
+
+
+
+          isSmall && styles.smallIconBox,
+
         ]}
-      />
 
-
-      <View
-        style={styles.decorLine}
-      />
-
-
-      {/* ===============================================
-          ICONO
-      =============================================== */}
-
-      <View
-        style={[
-          styles.iconContainer,
-
-          {
-            backgroundColor:
-              theme.iconBackground,
-          },
-        ]}
       >
+
         <MaterialCommunityIcons
+
           name={icon}
-          size={25}
-          color={theme.iconColor}
+
+          size={isHero ? 30 : isSmall ? 20 : 23}
+
+          color="#FFFFFF"
+
         />
+
       </View>
 
 
-      {/* ===============================================
-          TEXTO
-      =============================================== */}
+
+      {/* FLECHA */}
+
+
 
       <View
-        style={styles.textArea}
+
+        style={[
+
+          styles.arrowBox,
+
+
+
+          isHero && styles.heroArrowBox,
+
+
+
+          isSmall && styles.smallArrowBox,
+
+        ]}
+
       >
-        <Text
-          style={styles.title}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
 
-
-        <Text
-          style={styles.subtitle}
-          numberOfLines={1}
-        >
-          {subtitle}
-        </Text>
-      </View>
-
-
-      {/* ===============================================
-          FLECHA
-      =============================================== */}
-
-      <View
-        style={styles.arrow}
-      >
         <MaterialCommunityIcons
+
           name="chevron-right"
-          size={17}
-          color="rgba(255,255,255,0.55)"
+
+          size={isHero ? 19 : 17}
+
+          color="rgba(255,255,255,0.50)"
+
         />
+
       </View>
+
+
+
+      {/* TEXTO */}
+
+
+
+      <View
+
+        style={[
+
+          styles.textArea,
+
+
+
+          isHero && styles.heroTextArea,
+
+
+
+          isSmall && styles.smallTextArea,
+
+
+
+          isWide && styles.wideTextArea,
+
+        ]}
+
+      >
+
+        {isHero ? <Text style={styles.eyebrow}>TU MÚSICA</Text> : null}
+
+
+
+        <Text
+
+          style={[
+
+            styles.title,
+
+
+
+            isHero && styles.heroTitle,
+
+
+
+            isLarge && styles.largeTitle,
+
+
+
+            isSmall && styles.smallTitle,
+
+
+
+            isWide && styles.wideTitle,
+
+          ]}
+
+          numberOfLines={1}
+
+        >
+
+          {title}
+
+        </Text>
+
+
+
+        <Text
+
+          style={[
+
+            styles.subtitle,
+
+
+
+            isHero && styles.heroSubtitle,
+
+
+
+            isSmall && styles.smallSubtitle,
+
+          ]}
+
+          numberOfLines={1}
+
+        >
+
+          {subtitle}
+
+        </Text>
+
+      </View>
+
+
+
+      {/* INDICADOR ACTIVO */}
+
+
+
+      {active ? (
+
+        <View pointerEvents="none" style={styles.activeIndicator} />
+
+      ) : null}
+
     </TouchableOpacity>
+
   );
+
 }
 
 
-/* =========================================================
-   COLORES
-
-   No usamos un solo violeta.
-========================================================= */
-
-const THEMES = {
-  songs: {
-    background:
-      '#31204A',
-
-    glow:
-      'rgba(139,92,246,0.40)',
-
-    glowSecondary:
-      'rgba(96,165,250,0.20)',
-
-    iconBackground:
-      'rgba(255,255,255,0.12)',
-
-    iconColor:
-      '#E4D4FF',
-
-    border:
-      'rgba(167,139,250,0.65)',
-  },
-
-
-  albums: {
-    background:
-      '#123744',
-
-    glow:
-      'rgba(34,211,238,0.27)',
-
-    glowSecondary:
-      'rgba(59,130,246,0.22)',
-
-    iconBackground:
-      'rgba(255,255,255,0.12)',
-
-    iconColor:
-      '#C8F8FF',
-
-    border:
-      'rgba(103,232,249,0.62)',
-  },
-
-
-  artists: {
-    background:
-      '#3B2039',
-
-    glow:
-      'rgba(236,72,153,0.28)',
-
-    glowSecondary:
-      'rgba(168,85,247,0.20)',
-
-    iconBackground:
-      'rgba(255,255,255,0.12)',
-
-    iconColor:
-      '#FFD3E9',
-
-    border:
-      'rgba(244,114,182,0.62)',
-  },
-
-
-  folders: {
-    background:
-      '#17372F',
-
-    glow:
-      'rgba(52,211,153,0.25)',
-
-    glowSecondary:
-      'rgba(45,212,191,0.18)',
-
-    iconBackground:
-      'rgba(255,255,255,0.11)',
-
-    iconColor:
-      '#C8F9E7',
-
-    border:
-      'rgba(52,211,153,0.58)',
-  },
-
-
-  playlists: {
-    background:
-      '#3C2B16',
-
-    glow:
-      'rgba(245,158,11,0.28)',
-
-    glowSecondary:
-      'rgba(249,115,22,0.18)',
-
-    iconBackground:
-      'rgba(255,255,255,0.11)',
-
-    iconColor:
-      '#FFE7B7',
-
-    border:
-      'rgba(245,158,11,0.58)',
-  },
-
-
-  favorites: {
-    background:
-      '#421E2D',
-
-    glow:
-      'rgba(236,72,153,0.31)',
-
-    glowSecondary:
-      'rgba(239,68,68,0.16)',
-
-    iconBackground:
-      'rgba(255,255,255,0.12)',
-
-    iconColor:
-      '#FFD0DF',
-
-    border:
-      'rgba(236,72,153,0.64)',
-  },
-
-
-  recent: {
-    background:
-      '#243263',
-
-    glow:
-      'rgba(96,165,250,0.28)',
-
-    glowSecondary:
-      'rgba(99,102,241,0.23)',
-
-    iconBackground:
-      'rgba(255,255,255,0.11)',
-
-    iconColor:
-      '#D5DEFF',
-
-    border:
-      'rgba(129,140,248,0.60)',
-  },
-
-
-  top: {
-    background:
-      '#4A291E',
-
-    glow:
-      'rgba(249,115,22,0.30)',
-
-    glowSecondary:
-      'rgba(239,68,68,0.18)',
-
-    iconBackground:
-      'rgba(255,255,255,0.11)',
-
-    iconColor:
-      '#FFD7BF',
-
-    border:
-      'rgba(251,146,60,0.62)',
-  },
-} satisfies Record<
-  string,
-  CardTheme
->;
-
 
 /* =========================================================
-   GRID
-========================================================= */
+
+
+
+   BENTO ESCALONADO
+
+
+
+\\========================================================= */
+
+
 
 export default function LibraryGrid({
+
   songCount,
+
+
+
   albumCount,
+
+
+
   artistCount,
+
+
+
   playlistCount,
+
+
+
   favoriteCount,
+
+
+
   recentCount,
+
+
+
   favoritesOnly,
+
+
+
   onSongsPress,
+
+
+
   onAlbumsPress,
+
+
+
   onArtistsPress,
+
+
+
   onFoldersPress,
+
+
+
   onPlaylistsPress,
+
+
+
   onFavoritesPress,
+
+
+
   onRecentPress,
+
+
+
   onTopPress,
+
 }: Props) {
+
   return (
-    <View
-      style={styles.grid}
-    >
-      {/* CANCIONES */}
 
-      <LibraryCard
+    <View style={styles.container}>
+
+      {/* ===============================================
+
+
+
+          CANCIONES - HERO COMPLETO
+
+
+
+      =============================================== */}
+
+
+
+      <BentoCard
+
         title="Canciones"
+
         subtitle={`${songCount} canciones`}
+
         icon="music-note"
-        theme={THEMES.songs}
+
+        tint="rgba(129,140,248,0.20)"
+
+        activeTint="rgba(129,140,248,0.24)"
+
+        size="hero"
+
         active={!favoritesOnly}
+
         onPress={onSongsPress}
+
       />
 
 
-      {/* ÁLBUMES */}
 
-      <LibraryCard
-        title="Álbumes"
-        subtitle={`${albumCount} álbumes`}
-        icon="album"
-        theme={THEMES.albums}
-        onPress={onAlbumsPress}
-      />
+      {/* ===============================================
 
 
-      {/* ARTISTAS */}
 
-      <LibraryCard
-        title="Artistas"
-        subtitle={`${artistCount} artistas`}
-        icon="microphone-outline"
-        theme={THEMES.artists}
-        onPress={onArtistsPress}
-      />
+          FILA 1
 
 
-      {/* CARPETAS */}
 
-      <LibraryCard
-        title="Carpetas"
-        subtitle="Explorar música"
-        icon="folder-music-outline"
-        theme={THEMES.folders}
-        onPress={onFoldersPress}
-      />
+          ÁLBUMES + ARTISTAS - MISMO TAMAÑO
 
 
-      {/* PLAYLISTS */}
 
-      <LibraryCard
-        title="Playlists"
-        subtitle={`${playlistCount} playlists`}
-        icon="playlist-music-outline"
-        theme={THEMES.playlists}
-        onPress={onPlaylistsPress}
-      />
+      =============================================== */}
 
 
-      {/* FAVORITOS */}
 
-      <LibraryCard
-        title="Favoritos"
-        subtitle={`${favoriteCount} canciones`}
-        icon="heart-outline"
-        theme={THEMES.favorites}
-        active={favoritesOnly}
-        onPress={onFavoritesPress}
-      />
+      <View style={styles.row}>
 
+        <BentoCard
 
-      {/* RECIENTES */}
+          title="Álbumes"
 
-      <LibraryCard
-        title="Recientes"
-        subtitle={`${recentCount} reproducciones`}
-        icon="history"
-        theme={THEMES.recent}
-        onPress={onRecentPress}
-      />
+          subtitle={`${albumCount} álbumes`}
+
+          icon="album"
+
+          tint="rgba(139,92,246,0.20)"
 
 
-      {/* MÁS ESCUCHADAS */}
+          onPress={onAlbumsPress}
 
-      <LibraryCard
+        />
+
+
+
+        <BentoCard
+
+          title="Artistas"
+
+          subtitle={`${artistCount} artistas`}
+
+          icon="microphone-outline"
+
+          tint="rgba(217,70,239,0.19)"
+
+
+          onPress={onArtistsPress}
+
+        />
+
+      </View>
+
+
+
+      {/* ===============================================
+
+
+
+          FILA 2
+
+
+
+          CARPETAS + PLAYLISTS - MISMO TAMAÑO
+
+
+
+      =============================================== */}
+
+
+
+      <View style={styles.row}>
+
+        <BentoCard
+
+          title="Carpetas"
+
+          subtitle="Explorar música"
+
+          icon="folder-music-outline"
+
+          tint="rgba(45,212,191,0.18)"
+
+
+          onPress={onFoldersPress}
+
+        />
+
+
+
+        <BentoCard
+
+          title="Playlists"
+
+          subtitle={`${playlistCount} playlists`}
+
+          icon="playlist-music-outline"
+
+          tint="rgba(234,179,8,0.18)"
+
+
+          onPress={onPlaylistsPress}
+
+        />
+
+      </View>
+
+
+
+      {/* ===============================================
+
+
+
+          FILA 3
+
+
+
+          FAVORITOS + RECIENTES
+
+
+
+      =============================================== */}
+
+
+
+      <View style={styles.row}>
+
+        <BentoCard
+
+          title="Favoritos"
+
+          subtitle={`${favoriteCount} canciones`}
+
+          icon="heart-outline"
+
+          tint="rgba(251,113,133,0.20)"
+
+          activeTint="rgba(251,113,133,0.24)"
+
+          active={favoritesOnly}
+
+          onPress={onFavoritesPress}
+
+        />
+
+
+
+        <BentoCard
+
+          title="Recientes"
+
+          subtitle={`${recentCount} reproducciones`}
+
+          icon="history"
+
+          tint="rgba(56,189,248,0.19)"
+
+          onPress={onRecentPress}
+
+        />
+
+      </View>
+
+
+
+      {/* ===============================================
+
+
+
+          MÁS ESCUCHADAS - HORIZONTAL
+
+
+
+      =============================================== */}
+
+
+
+      <BentoCard
+
         title="Más escuchadas"
-        subtitle="Tus favoritas"
+
+        subtitle="Tus canciones favoritas"
+
         icon="fire"
-        theme={THEMES.top}
+
+        tint="rgba(251,146,60,0.19)"
+
+        size="wide"
+
         onPress={onTopPress}
+
       />
+
     </View>
+
   );
+
 }
 
 
+
 /* =========================================================
+
+
+
    ESTILOS
-========================================================= */
-
-const styles =
-  StyleSheet.create({
-    grid: {
-      flexDirection:
-        'row',
-
-      flexWrap:
-        'wrap',
-
-      justifyContent:
-        'space-between',
-
-      marginBottom:
-        24,
-    },
 
 
-    card: {
-      width:
-        '48.3%',
 
-      minHeight:
-        112,
-
-      borderRadius:
-        21,
-
-      marginBottom:
-        12,
-
-      paddingHorizontal:
-        14,
-
-      paddingVertical:
-        14,
-
-      overflow:
-        'hidden',
-
-      borderWidth:
-        1,
-
-      justifyContent:
-        'space-between',
-    },
+\\========================================================= */
 
 
-    /* =====================================================
-       DECORACIÓN
+
+const styles = StyleSheet.create({
+
+  container: {
+
+    width: "100%",
+
+
+
+    marginBottom: 28,
+
+  },
+
+
+
+  row: {
+
+    width: "100%",
+
+
+
+    flexDirection: "row",
+
+
+
+    justifyContent: "space-between",
+
+
+
+    alignItems: "stretch",
+
+
+
+    marginTop: 8,
+
+  },
+
+
+
+  /* =====================================================
+
+
+
+       TARJETAS
+
+
+
+       Mantengo la misma paleta del diseño anterior.
+
+
+
     ===================================================== */
 
-    glow: {
-      position:
-        'absolute',
-
-      width:
-        125,
-
-      height:
-        125,
-
-      borderRadius:
-        63,
-
-      top:
-        -58,
-
-      right:
-        -34,
-    },
 
 
-    glowSecondary: {
-      position:
-        'absolute',
+  card: {
 
-      width:
-        90,
-
-      height:
-        90,
-
-      borderRadius:
-        45,
-
-      bottom:
-        -48,
-
-      left:
-        -32,
-    },
+    width: "48.3%",
 
 
-    decorLine: {
-      position:
-        'absolute',
 
-      width:
-        110,
-
-      height:
-        1,
-
-      right:
-        -26,
-
-      bottom:
-        34,
-
-      backgroundColor:
-        'rgba(255,255,255,0.09)',
-
-      transform: [
-        {
-          rotate:
-            '-22deg',
-        },
-      ],
-    },
+    minHeight: 90,
 
 
-    /* =====================================================
-       ICONO
+
+    borderRadius: 22,
+
+
+
+    paddingHorizontal: 12,
+
+
+
+    paddingVertical: 10,
+
+
+
+    overflow: "hidden",
+
+
+
+    justifyContent: "space-between",
+
+
+
+    backgroundColor: "rgba(10,12,18,0.08)",
+
+
+
+    borderWidth: StyleSheet.hairlineWidth,
+
+
+
+    borderColor: "rgba(255,255,255,0.14)",
+
+  },
+
+
+
+  heroCard: {
+
+    width: "100%",
+
+
+
+    minHeight: 116,
+
+
+
+    borderRadius: 24,
+
+
+
+    paddingHorizontal: 14,
+
+
+
+    paddingVertical: 12,
+
+
+
+    backgroundColor: "rgba(10,12,18,0.08)",
+
+
+
+    borderColor: "rgba(255,255,255,0.15)",
+
+  },
+
+
+
+  largeCard: {
+
+    width: "61.8%",
+
+
+
+    minHeight: 132,
+
+  },
+
+
+
+  smallCard: {
+
+    width: "35.2%",
+
+
+
+    minHeight: 132,
+
+
+
+    paddingHorizontal: 13,
+
+
+
+    paddingVertical: 13,
+
+  },
+
+
+
+  wideCard: {
+
+    width: "100%",
+
+
+
+    minHeight: 78,
+
+
+
+    marginTop: 8,
+
+
+
+    paddingHorizontal: 12,
+
+
+
+    paddingVertical: 9,
+
+  },
+
+
+
+  activeCard: {
+
+    backgroundColor: "rgba(21,23,30,0.42)",
+
+
+
+    borderColor: "rgba(255,255,255,0.22)",
+
+  },
+
+
+
+  colorBackdrop: {
+
+    position: "absolute",
+
+
+
+    top: 0,
+
+
+
+    right: 0,
+
+
+
+    bottom: 0,
+
+
+
+    left: 0,
+
+  },
+
+
+
+  colorDepth: {
+
+    position: "absolute",
+
+
+
+    top: 0,
+
+
+
+    right: 0,
+
+
+
+    bottom: 0,
+
+
+
+    left: 0,
+
+
+
+    backgroundColor: "rgba(8,10,16,0.10)",
+
+  },
+
+
+
+  cardReflection: {
+
+    position: "absolute",
+
+
+
+    top: 0,
+
+
+
+    left: 20,
+
+
+
+    right: 20,
+
+
+
+    height: StyleSheet.hairlineWidth,
+
+
+
+    backgroundColor: "rgba(255,255,255,0.18)",
+
+  },
+
+
+
+  activeIndicator: {
+
+    position: "absolute",
+
+
+
+    left: 17,
+
+
+
+    bottom: 0,
+
+
+
+    width: 27,
+
+
+
+    height: 2,
+
+
+
+    borderRadius: 2,
+
+
+
+    backgroundColor: "rgba(255,255,255,0.58)",
+
+  },
+
+
+
+  /* =====================================================
+
+
+
+       ICONOS
+
+
+
     ===================================================== */
 
-    iconContainer: {
-      width:
-        42,
-
-      height:
-        42,
-
-      borderRadius:
-        14,
-
-      justifyContent:
-        'center',
-
-      alignItems:
-        'center',
-    },
 
 
-    /* =====================================================
+  iconBox: {
+
+    width: 36,
+
+
+
+    height: 36,
+
+
+
+    borderRadius: 12,
+
+
+
+    alignItems: "center",
+
+
+
+    justifyContent: "center",
+
+
+
+    backgroundColor: "rgba(255,255,255,0.075)",
+
+
+
+    borderWidth: StyleSheet.hairlineWidth,
+
+
+
+    borderColor: "rgba(255,255,255,0.09)",
+
+  },
+
+
+
+  heroIconBox: {
+
+    width: 42,
+
+
+
+    height: 42,
+
+
+
+    borderRadius: 14,
+
+  },
+
+
+
+  smallIconBox: {
+
+    width: 38,
+
+
+
+    height: 38,
+
+
+
+    borderRadius: 13,
+
+  },
+
+
+
+  /* =====================================================
+
+
+
+       FLECHAS
+
+
+
+    ===================================================== */
+
+
+
+  arrowBox: {
+
+    position: "absolute",
+
+
+
+    top: 14,
+
+
+
+    right: 13,
+
+
+
+    width: 29,
+
+
+
+    height: 29,
+
+
+
+    borderRadius: 15,
+
+
+
+    alignItems: "center",
+
+
+
+    justifyContent: "center",
+
+  },
+
+
+
+  heroArrowBox: {
+
+    top: 17,
+
+
+
+    right: 17,
+
+
+
+    width: 34,
+
+
+
+    height: 34,
+
+  },
+
+
+
+  smallArrowBox: {
+
+    top: 12,
+
+
+
+    right: 10,
+
+
+
+    width: 25,
+
+
+
+    height: 25,
+
+  },
+
+
+
+  /* =====================================================
+
+
+
        TEXTO
+
+
+
     ===================================================== */
 
-    textArea: {
-      marginTop:
-        11,
-
-      paddingRight:
-        17,
-    },
 
 
-    title: {
-      color:
-        '#FFFFFF',
+  textArea: {
 
-      fontSize:
-        14,
-
-      fontWeight:
-        '700',
-    },
+    marginTop: 10,
 
 
-    subtitle: {
-      color:
-        'rgba(255,255,255,0.68)',
 
-      fontSize:
-        10,
+    paddingRight: 5,
 
-      fontWeight:
-        '500',
-
-      marginTop:
-        4,
-    },
+  },
 
 
-    /* =====================================================
-       FLECHA
-    ===================================================== */
 
-    arrow: {
-      position:
-        'absolute',
+  heroTextArea: {
 
-      right:
-        9,
+    marginTop: 13,
 
-      bottom:
-        10,
+  },
 
-      width:
-        25,
 
-      height:
-        25,
 
-      borderRadius:
-        13,
+  smallTextArea: {
 
-      backgroundColor:
-        'rgba(255,255,255,0.08)',
+    marginTop: 18,
 
-      alignItems:
-        'center',
 
-      justifyContent:
-        'center',
-    },
-  });
+
+    paddingRight: 0,
+
+  },
+
+
+
+  wideTextArea: {
+
+    marginTop: 8,
+
+
+
+    width: "75%",
+
+  },
+
+
+
+  eyebrow: {
+
+    color: "rgba(255,255,255,0.42)",
+
+
+
+    fontSize: 9,
+
+
+
+    fontWeight: "700",
+
+
+
+    letterSpacing: 1.4,
+
+
+
+    marginBottom: 5,
+
+  },
+
+
+
+  title: {
+
+    color: "rgba(255,255,255,0.94)",
+
+
+
+    fontSize: 13,
+
+
+
+    fontWeight: "700",
+
+
+
+    letterSpacing: -0.15,
+
+  },
+
+
+
+  heroTitle: {
+
+    color: "#FFFFFF",
+
+
+
+    fontSize: 21,
+
+
+
+    fontWeight: "800",
+
+
+
+    letterSpacing: -0.5,
+
+  },
+
+
+
+  largeTitle: {
+
+    fontSize: 16,
+
+  },
+
+
+
+  smallTitle: {
+
+    fontSize: 13,
+
+  },
+
+
+
+  wideTitle: {
+
+    fontSize: 14,
+
+  },
+
+
+
+  subtitle: {
+
+    color: "rgba(255,255,255,0.46)",
+
+
+
+    fontSize: 10,
+
+
+
+    fontWeight: "500",
+
+
+
+    marginTop: 4,
+
+  },
+
+
+
+  heroSubtitle: {
+
+    color: "rgba(255,255,255,0.56)",
+
+
+
+    fontSize: 11,
+
+
+
+    marginTop: 5,
+
+  },
+
+
+
+  smallSubtitle: {
+
+    fontSize: 9,
+
+  },
+
+});

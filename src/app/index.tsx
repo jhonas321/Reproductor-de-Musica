@@ -363,6 +363,12 @@ export default function HomeScreen() {
     >(null);
 
 
+  const songsSectionYRef =
+    useRef(
+      0
+    );
+
+
   const [
     showScrollTop,
     setShowScrollTop,
@@ -387,7 +393,7 @@ export default function HomeScreen() {
 
         const shouldShow =
           offsetY >
-          500;
+          220;
 
 
         setShowScrollTop(
@@ -411,6 +417,31 @@ export default function HomeScreen() {
 
             animated: true,
           });
+      },
+      []
+    );
+
+
+  const scrollToSongs =
+    useCallback(
+      () => {
+        setTimeout(
+          () => {
+            listRef.current
+              ?.scrollToOffset({
+                offset:
+                  Math.max(
+                    0,
+                    songsSectionYRef
+                      .current -
+                      12
+                  ),
+
+                animated: true,
+              });
+          },
+          100
+        );
       },
       []
     );
@@ -1484,6 +1515,13 @@ export default function HomeScreen() {
             setSearchText(
               ''
             );
+
+            if (
+              songs.length >
+              0
+            ) {
+              scrollToSongs();
+            }
           }}
 
           onAlbumsPress={() =>
@@ -1617,6 +1655,12 @@ export default function HomeScreen() {
         <View
           style={
             styles.listTitleRow
+          }
+          onLayout={
+            event => {
+              songsSectionYRef.current =
+                event.nativeEvent.layout.y;
+            }
           }
         >
           <View

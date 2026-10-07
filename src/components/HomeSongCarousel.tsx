@@ -3,10 +3,19 @@ import {
 } from '@expo/vector-icons';
 
 import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  LayoutAnimation,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 
@@ -45,6 +54,75 @@ interface Props {
 }
 
 
+/*
+ * Animación suave cuando las tarjetas cambian de posición.
+ */
+if (
+  Platform.OS ===
+    'android' &&
+  UIManager
+    .setLayoutAnimationEnabledExperimental
+) {
+  try {
+    UIManager
+      .setLayoutAnimationEnabledExperimental(
+        true
+      );
+  } catch {
+    /*
+     * En algunas versiones / arquitecturas nuevas
+     * no hace falta habilitarlo manualmente.
+     */
+  }
+}
+
+
+const REORDER_ANIMATION = {
+  duration: 230,
+
+  create: {
+    type:
+      LayoutAnimation.Types
+        .easeInEaseOut,
+
+    property:
+      LayoutAnimation.Properties
+        .opacity,
+  },
+
+  update: {
+    type:
+      LayoutAnimation.Types
+        .easeInEaseOut,
+  },
+
+  delete: {
+    type:
+      LayoutAnimation.Types
+        .easeInEaseOut,
+
+    property:
+      LayoutAnimation.Properties
+        .opacity,
+  },
+};
+
+
+function getOrderKey(
+  songs:
+    Song[]
+) {
+  return songs
+    .map(
+      song =>
+        song.id
+    )
+    .join(
+      '|'
+    );
+}
+
+
 export default function HomeSongCarousel({
   title,
 
@@ -62,8 +140,70 @@ export default function HomeSongCarousel({
 
   onSeeAll,
 }: Props) {
+  /*
+   * Conservamos una copia visual.
+   *
+   * Cuando cambia el orden, configuramos la animación antes de
+   * reemplazar la lista visual. Así cada tarjeta se desplaza
+   * suavemente hacia su nueva posición.
+   */
+  const [
+    displayedSongs,
+    setDisplayedSongs,
+  ] =
+    useState<Song[]>(
+      songs
+    );
+
+
+  const previousOrderRef =
+    useRef(
+      getOrderKey(
+        songs
+      )
+    );
+
+
+  useEffect(
+    () => {
+      const nextOrder =
+        getOrderKey(
+          songs
+        );
+
+
+      const orderChanged =
+        nextOrder !==
+          previousOrderRef
+            .current;
+
+
+      if (
+        orderChanged
+      ) {
+        LayoutAnimation
+          .configureNext(
+            REORDER_ANIMATION
+          );
+      }
+
+
+      previousOrderRef.current =
+        nextOrder;
+
+
+      setDisplayedSongs(
+        songs
+      );
+    },
+    [
+      songs,
+    ]
+  );
+
+
   if (
-    songs.length ===
+    displayedSongs.length ===
     0
   ) {
     return null;
@@ -161,7 +301,7 @@ export default function HomeSongCarousel({
           styles.list
         }
       >
-        {songs.map(
+        {displayedSongs.map(
           item => {
             const active =
               item.id ===

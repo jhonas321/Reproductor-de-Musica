@@ -561,6 +561,18 @@ export function AppProvider({
     );
 
 
+  /*
+   * =========================================================
+   * REGISTRO DE REPRODUCCIONES
+   * =========================================================
+   *
+   * Una canción cuenta como reproducida solamente cuando
+   * realmente está sonando.
+   *
+   * Esto evita que al abrir la app y restaurar la última
+   * canción pausada se sume una reproducción falsa y se mueva
+   * al primer lugar de "Escuchado recientemente".
+   */
   const lastRegistered =
     useRef<
       string | null
@@ -576,8 +588,16 @@ export function AppProvider({
         null;
 
 
+      if (!id) {
+        lastRegistered.current =
+          null;
+
+        return;
+      }
+
+
       if (
-        !id ||
+        !playerFull.isPlaying ||
         id ===
           lastRegistered
             .current
@@ -598,6 +618,9 @@ export function AppProvider({
       playerFull
         .currentSong
         ?.id,
+
+      playerFull
+        .isPlaying,
 
       rawStats
         .registerPlay,

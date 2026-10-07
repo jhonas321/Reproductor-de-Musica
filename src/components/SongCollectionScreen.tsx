@@ -9,9 +9,12 @@ import {
 import {
   Alert,
   FlatList,
+  LayoutAnimation,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 
@@ -21,7 +24,9 @@ import {
 
 import {
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -76,6 +81,9 @@ interface Props {
 
   emptyText?:
     string;
+
+  animateReorder?:
+    boolean;
 
   onRemoveSong?:
     (
@@ -169,6 +177,78 @@ function SelectionAction({
 }
 
 
+/*
+ * Animación de reordenamiento para colecciones que cambian
+ * de posición, como "Escuchado recientemente".
+ */
+if (
+  Platform.OS ===
+    'android' &&
+  UIManager
+    .setLayoutAnimationEnabledExperimental
+) {
+  try {
+    UIManager
+      .setLayoutAnimationEnabledExperimental(
+        true
+      );
+  } catch {
+    /*
+     * En algunas versiones / arquitecturas nuevas
+     * no hace falta habilitarlo manualmente.
+     */
+  }
+}
+
+
+const REORDER_ANIMATION = {
+  duration: 230,
+
+  create: {
+    type:
+      LayoutAnimation.Types
+        .easeInEaseOut,
+
+    property:
+      LayoutAnimation.Properties
+        .opacity,
+  },
+
+  update: {
+    type:
+      LayoutAnimation.Types
+        .easeInEaseOut,
+  },
+
+  delete: {
+    type:
+      LayoutAnimation.Types
+        .easeInEaseOut,
+
+    property:
+      LayoutAnimation.Properties
+        .opacity,
+  },
+};
+
+
+function getSongOrderKey(
+  songs:
+    Song[]
+) {
+  return songs
+    .map(
+      song =>
+        song.id
+    )
+    .join(
+      '|'
+    );
+}
+
+
+
+
 export default function SongCollectionScreen({
   title,
 
@@ -184,6 +264,9 @@ export default function SongCollectionScreen({
   emptyText =
     'No hay canciones aquí.',
 
+  animateReorder =
+    false,
+
   onRemoveSong,
 }: Props) {
   const {
@@ -196,6 +279,80 @@ export default function SongCollectionScreen({
     library,
   } =
     useApp();
+
+
+  /*
+   * =========================================================
+   * LISTA VISUAL ANIMADA
+   * =========================================================
+   *
+   * Solo se activa cuando animateReorder=true.
+   *
+   * La lista real puede cambiar de orden instantáneamente.
+   * Conservamos una copia visual y la reemplazamos justo
+   * después de preparar LayoutAnimation.
+   */
+  const [
+    displayedSongs,
+    setDisplayedSongs,
+  ] =
+    useState<Song[]>(
+      songs
+    );
+
+
+  const previousOrderRef =
+    useRef(
+      getSongOrderKey(
+        songs
+      )
+    );
+
+
+  useEffect(
+    () => {
+      const nextOrder =
+        getSongOrderKey(
+          songs
+        );
+
+
+      const orderChanged =
+        nextOrder !==
+          previousOrderRef
+            .current;
+
+
+      if (
+        animateReorder &&
+        orderChanged
+      ) {
+        LayoutAnimation
+          .configureNext(
+            REORDER_ANIMATION
+          );
+      }
+
+
+      previousOrderRef.current =
+        nextOrder;
+
+
+      setDisplayedSongs(
+        songs
+      );
+    },
+    [
+      songs,
+      animateReorder,
+    ]
+  );
+
+
+  const listSongs =
+    animateReorder
+      ? displayedSongs
+      : songs;
 
 
   /* =========================================================
@@ -931,7 +1088,7 @@ export default function SongCollectionScreen({
 
       <FlatList
         data={
-          songs
+          listSongs
         }
 
         keyExtractor={
@@ -945,7 +1102,7 @@ export default function SongCollectionScreen({
 
         ListHeaderComponent={
           artwork ||
-          songs.length >
+          listSongs.length >
             0 ? (
             <View
               style={
@@ -955,7 +1112,7 @@ export default function SongCollectionScreen({
               <Artwork
                 uri={
                   artwork ??
-                  songs[0]
+                  listSongs[0]
                     ?.artwork
                 }
 
@@ -994,12 +1151,12 @@ export default function SongCollectionScreen({
                   styles.heroSubtitle
                 }
               >
-                {songs.length} canciones
+                {listSongs.length} canciones
               </Text>
 
 
               {!selectionMode &&
-              songs.length >
+              listSongs.length >
                 0 && (
                 <View
                   style={
@@ -1083,7 +1240,9 @@ export default function SongCollectionScreen({
           false
         }
 
-        removeClippedSubviews
+        removeClippedSubviews={
+          !animateReorder
+        }
 
         initialNumToRender={
           12

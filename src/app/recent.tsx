@@ -72,6 +72,8 @@ import {
         songs={
           songs
         }
+
+        animateReorder
   
         emptyText=
           "Aún no hay historial de reproducción."

@@ -42,6 +42,7 @@ import androidx.media3.exoplayer.source.MediaSource
 import java.io.File
 import java.util.Collections
 import java.util.IdentityHashMap
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
@@ -183,6 +184,13 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
   private var exoPlayer: ExoPlayer? = null
   internal var castPlayer: CastPlayer? = null
   internal var activePlayer: Player? = null
+
+  // HMUSIC: IDs favoritos conocidos por la notificación.
+  // Se guardan también en SharedPreferences para sobrevivir reinicios.
+  private val hmusicFavoriteSongIds =
+    mutableSetOf<String>()
+
+  private var hmusicFavoriteActive = false
 
   // HMUSIC EQ: comparte con el módulo HmusicEqualizer la sesión real de ExoPlayer.
   private fun updateHmusicAudioSessionId(audioSessionId: Int) {
@@ -339,6 +347,8 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
 
     this.activePlayer = activePlayer
 
+    loadHmusicFavoriteSongIds()
+
     val controller = SleepTimerController(activePlayer)
     sleepTimerController = controller
     controller.onTriggered = { type ->
@@ -365,6 +375,11 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
 
       override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         livePositionGuard.onMediaItemTransition(activePlayer)
+
+        // El corazón refleja el estado guardado de ESTA canción.
+        refreshHmusicFavoriteForMediaItem(
+          mediaItem
+        )
         lastMediaMetadata = null
         val currentIndex = activePlayer.currentMediaItemIndex
         sleepTimerController?.handleItemTransition(currentIndex)
@@ -444,6 +459,9 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
 
     mediaSession = MediaLibraryService.MediaLibrarySession.Builder(this, player, this)
       .apply { sessionActivity?.let { setSessionActivity(it) } }
+      .setMediaButtonPreferences(
+        buildHmusicMediaButtonPreferences()
+      )
       .build()
 
     BrowseTreeRepository.onCommitted = onBrowseTreeCommitted
@@ -538,6 +556,163 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
         }
       }
     }
+  }
+
+  /*
+   * =========================================================
+   * HMUSIC - BOTONES PERSONALIZADOS DE NOTIFICACIÓN
+   * =========================================================
+   *
+   * Orden visual deseado:
+   *
+   *   Aleatorio | Anterior | Play/Pausa | Siguiente | Favorito
+   *
+   * Los controles estándar continúan siendo administrados por Media3.
+   */
+  private fun emitHmusicNotificationSignal(position: Double) {
+    val event = RemoteSeekEvent(position)
+
+    if (reactContextUsable()) {
+      emitEvent(event)
+    } else {
+      EventBroker.submit(applicationContext, event)
+    }
+  }
+
+  private fun loadHmusicFavoriteSongIds() {
+    val prefs =
+      getSharedPreferences(
+        HMUSIC_NOTIFICATION_PREFS,
+        MODE_PRIVATE
+      )
+
+    hmusicFavoriteSongIds.clear()
+
+    hmusicFavoriteSongIds.addAll(
+      prefs.getStringSet(
+        HMUSIC_NOTIFICATION_FAVORITES_KEY,
+        emptySet()
+      ) ?: emptySet()
+    )
+  }
+
+  private fun persistHmusicFavoriteSongIds() {
+    getSharedPreferences(
+      HMUSIC_NOTIFICATION_PREFS,
+      MODE_PRIVATE
+    )
+      .edit()
+      .putStringSet(
+        HMUSIC_NOTIFICATION_FAVORITES_KEY,
+        HashSet(
+          hmusicFavoriteSongIds
+        )
+      )
+      .apply()
+  }
+
+  private fun refreshHmusicFavoriteForMediaItem(
+    mediaItem:
+      MediaItem?
+  ) {
+    val mediaId =
+      mediaItem?.mediaId
+
+    hmusicFavoriteActive =
+      mediaId != null &&
+      hmusicFavoriteSongIds
+        .contains(
+          mediaId
+        )
+
+    refreshHmusicMediaButtons()
+  }
+
+  @OptIn(UnstableApi::class)
+  private fun buildHmusicMediaButtonPreferences(): ImmutableList<CommandButton> {
+    val player = activePlayer
+
+    val modeIcon =
+      when {
+        player?.shuffleModeEnabled == true ->
+          CommandButton.ICON_SHUFFLE_ON
+
+        player?.repeatMode == Player.REPEAT_MODE_ONE ->
+          CommandButton.ICON_REPEAT_ONE
+
+        else ->
+          CommandButton.ICON_REPEAT_ALL
+      }
+
+    val modeName =
+      when {
+        player?.shuffleModeEnabled == true ->
+          "Aleatorio"
+
+        player?.repeatMode == Player.REPEAT_MODE_ONE ->
+          "Repetir una"
+
+        else ->
+          "Repetir todo"
+      }
+
+    val modeButton =
+      CommandButton.Builder(
+        modeIcon
+      )
+        .setDisplayName(
+          modeName
+        )
+        .setSessionCommand(
+          SessionCommand(
+            COMMAND_HMUSIC_CYCLE_PLAYBACK_MODE,
+            Bundle.EMPTY
+          )
+        )
+        .setSlots(
+          CommandButton.SLOT_BACK_SECONDARY,
+          CommandButton.SLOT_OVERFLOW
+        )
+        .build()
+
+    val favoriteButton =
+      CommandButton.Builder(
+        if (hmusicFavoriteActive) {
+          CommandButton.ICON_HEART_FILLED
+        } else {
+          CommandButton.ICON_HEART_UNFILLED
+        }
+      )
+        .setDisplayName(
+          if (hmusicFavoriteActive) {
+            "Quitar de favoritos"
+          } else {
+            "Agregar a favoritos"
+          }
+        )
+        .setSessionCommand(
+          SessionCommand(
+            COMMAND_HMUSIC_TOGGLE_FAVORITE,
+            Bundle.EMPTY
+          )
+        )
+        .setSlots(
+          CommandButton.SLOT_FORWARD_SECONDARY,
+          CommandButton.SLOT_OVERFLOW
+        )
+        .build()
+
+    return ImmutableList.of(
+      modeButton,
+      favoriteButton
+    )
+  }
+
+  @OptIn(UnstableApi::class)
+  private fun refreshHmusicMediaButtons() {
+    mediaSession?.setMediaButtonPreferences(
+      buildHmusicMediaButtonPreferences()
+    )
   }
 
   @OptIn(UnstableApi::class)
@@ -758,6 +933,99 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
           livePositionGuard.onSeek(it)
         }
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+      }
+      COMMAND_HMUSIC_CYCLE_PLAYBACK_MODE -> {
+        activePlayer?.let { player ->
+          val targetSignal =
+            when {
+              /*
+               * Aleatorio -> Repetir una
+               */
+              player.shuffleModeEnabled -> {
+                player.shuffleModeEnabled = false
+                player.repeatMode = Player.REPEAT_MODE_ONE
+
+                HMUSIC_NOTIFICATION_REPEAT_ONE_SIGNAL
+              }
+
+              /*
+               * Repetir una -> Repetir todo
+               */
+              player.repeatMode == Player.REPEAT_MODE_ONE -> {
+                player.shuffleModeEnabled = false
+                player.repeatMode = Player.REPEAT_MODE_ALL
+
+                HMUSIC_NOTIFICATION_REPEAT_ALL_SIGNAL
+              }
+
+              /*
+               * Repetir todo -> Aleatorio
+               */
+              else -> {
+                player.repeatMode = Player.REPEAT_MODE_OFF
+                player.shuffleModeEnabled = true
+
+                HMUSIC_NOTIFICATION_SHUFFLE_SIGNAL
+              }
+            }
+
+          refreshHmusicMediaButtons()
+
+          emitHmusicNotificationSignal(
+            targetSignal
+          )
+        }
+
+        return Futures.immediateFuture(
+          SessionResult(
+            SessionResult.RESULT_SUCCESS
+          )
+        )
+      }
+      COMMAND_HMUSIC_TOGGLE_FAVORITE -> {
+        val mediaId =
+          activePlayer
+            ?.currentMediaItem
+            ?.mediaId
+
+        if (mediaId != null) {
+          if (
+            hmusicFavoriteSongIds
+              .contains(
+                mediaId
+              )
+          ) {
+            hmusicFavoriteSongIds
+              .remove(
+                mediaId
+              )
+          } else {
+            hmusicFavoriteSongIds
+              .add(
+                mediaId
+              )
+          }
+
+          persistHmusicFavoriteSongIds()
+
+          hmusicFavoriteActive =
+            hmusicFavoriteSongIds
+              .contains(
+                mediaId
+              )
+
+          refreshHmusicMediaButtons()
+
+          emitHmusicNotificationSignal(
+            HMUSIC_NOTIFICATION_FAVORITE_SIGNAL
+          )
+        }
+
+        return Futures.immediateFuture(
+          SessionResult(
+            SessionResult.RESULT_SUCCESS
+          )
+        )
       }
       COMMAND_SLEEP_AFTER_TIME -> {
         val seconds = args.getDouble("seconds")
@@ -1006,6 +1274,8 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
       .add(SessionCommand(COMMAND_SEEK_BY, Bundle.EMPTY))
       .add(SessionCommand(COMMAND_SEEK_TO_NEXT, Bundle.EMPTY))
       .add(SessionCommand(COMMAND_SEEK_TO_PREVIOUS, Bundle.EMPTY))
+      .add(SessionCommand(COMMAND_HMUSIC_CYCLE_PLAYBACK_MODE, Bundle.EMPTY))
+      .add(SessionCommand(COMMAND_HMUSIC_TOGGLE_FAVORITE, Bundle.EMPTY))
       .add(SessionCommand(COMMAND_UPDATE_PROGRESS_SYNC_HEADERS, Bundle.EMPTY))
       .add(SessionCommand(COMMAND_SLEEP_AFTER_TIME, Bundle.EMPTY))
       .add(SessionCommand(COMMAND_SLEEP_AFTER_MEDIA_ITEM, Bundle.EMPTY))
@@ -1316,6 +1586,18 @@ class TrackPlayerPlaybackService: MediaLibraryService(), MediaLibraryService.Med
     const val COMMAND_SEEK_BY = "trackplayer.seek_by"
     const val COMMAND_SEEK_TO_NEXT = "trackplayer.seek_to_next"
     const val COMMAND_SEEK_TO_PREVIOUS = "trackplayer.seek_to_previous"
+
+    const val HMUSIC_NOTIFICATION_PREFS = "hmusic_notification_state"
+    const val HMUSIC_NOTIFICATION_FAVORITES_KEY = "favorite_song_ids"
+
+    const val COMMAND_HMUSIC_CYCLE_PLAYBACK_MODE = "hmusic.notification.cycle_playback_mode"
+    const val COMMAND_HMUSIC_TOGGLE_FAVORITE = "hmusic.notification.toggle_favorite"
+
+    const val HMUSIC_NOTIFICATION_SHUFFLE_SIGNAL = -987654321.01
+    const val HMUSIC_NOTIFICATION_FAVORITE_SIGNAL = -987654321.02
+    const val HMUSIC_NOTIFICATION_REPEAT_ONE_SIGNAL = -987654321.03
+    const val HMUSIC_NOTIFICATION_REPEAT_ALL_SIGNAL = -987654321.04
+
     const val COMMAND_UPDATE_PROGRESS_SYNC_HEADERS = "trackplayer.update_progress_sync_headers"
     const val PROGRESS_SYNC_SAVED_KEY = "progress_sync_saved"
     const val COMMAND_SLEEP_AFTER_TIME = "trackplayer.sleep_after_time"

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import TrackPlayer, {
   RepeatMode as TrackRepeatMode,
   useActiveMediaItem,
@@ -111,24 +112,37 @@ export function useMusicPlayer(
   currentTimeRef.current = progress.position || 0;
 
   /* =========================================================
+
      COLA ACTIVA
+
   ========================================================= */
 
   const activeQueue = useMemo(
     () => (queue.length > 0 ? queue : songs),
+
     [queue, songs]
   );
 
   /*
+
    * Guardamos la cola más reciente en un ref.
+
    *
+
    * IMPORTANTE:
+
    * La sincronización con RNTP no debe depender directamente
+
    * de activeQueue. Cuando reconstruimos la cola, React actualiza
+
    * activeQueue antes de que RNTP termine de actualizar
+
    * activeMediaItem. Si el efecto se dispara en ese intervalo,
+
    * puede restaurar temporalmente la canción anterior.
+
    */
+
   const activeQueueRef = useRef<Song[]>(activeQueue);
 
   activeQueueRef.current = activeQueue;
@@ -138,6 +152,7 @@ export function useMusicPlayer(
       currentSong
         ? activeQueue.findIndex((song) => song.id === currentSong.id)
         : -1,
+
     [currentSong, activeQueue]
   );
 
@@ -160,6 +175,7 @@ export function useMusicPlayer(
 
       return uniqueSongs([song, ...base]);
     },
+
     [activeQueue, songs]
   );
 
@@ -170,25 +186,45 @@ export function useMusicPlayer(
   }, []);
 
   /* =========================================================
+
      SINCRONIZAR CANCIÓN ACTIVA DESDE RNTP
 
+
+
      Esto permite que Next/Previous desde notificación, lockscreen
+
      o audífonos también actualicen la interfaz.
 
+
+
      IMPORTANTE:
+
      NO dependemos de activeQueue.
 
+
+
      Al reproducir una canción hacemos:
+
        1. setQueue(...)
+
        2. setCurrentSong(...)
+
        3. TrackPlayer.setMediaItems(...)
 
+
+
      React puede aplicar 1 y 2 antes de que RNTP termine el paso 3.
+
      Si este efecto dependiera de activeQueue, se ejecutaría con el
+
      mediaId NATIVO anterior y haría el salto visual:
+
        nueva -> anterior -> nueva
 
+
+
      La cola actual se consulta por ref, sin usarla como disparador.
+
   ========================================================= */
 
   useEffect(() => {
@@ -220,7 +256,9 @@ export function useMusicPlayer(
   }, [activeMediaItem?.mediaId, songs, pushHistory]);
 
   /* =========================================================
+
      PERSISTENCIA
+
   ========================================================= */
 
   const persist = useCallback(
@@ -245,11 +283,14 @@ export function useMusicPlayer(
         console.log("Error guardando estado del reproductor:", error);
       }
     },
+
     [currentSong, activeQueue, shuffle, repeatMode]
   );
 
   /* =========================================================
+
      RESTAURAR ÚLTIMA SESIÓN
+
   ========================================================= */
 
   useEffect(() => {
@@ -276,7 +317,9 @@ export function useMusicPlayer(
         const restoredQueue = (
           Array.isArray(saved.queueIds) ? saved.queueIds : []
         )
+
           .map((id) => (typeof id === "string" ? map.get(id) : undefined))
+
           .filter(Boolean) as Song[];
 
         const song =
@@ -285,7 +328,9 @@ export function useMusicPlayer(
         historyRef.current = (
           Array.isArray(saved.historyIds) ? saved.historyIds : []
         )
+
           .filter((id): id is string => typeof id === "string" && map.has(id))
+
           .slice(-MAX_HISTORY_ITEMS);
 
         const restoredRepeatMode: RepeatMode = isRepeatMode(saved.repeatMode)
@@ -323,6 +368,7 @@ export function useMusicPlayer(
 
         const index = Math.max(
           0,
+
           queueWithSong.findIndex((item) => item.id === song.id)
         );
 
@@ -339,8 +385,11 @@ export function useMusicPlayer(
         }
 
         /*
+
          * Restauramos la canción y la posición,
+
          * pero no reproducimos automáticamente.
+
          */
       } catch (error) {
         console.log("Error restaurando reproductor:", error);
@@ -349,7 +398,9 @@ export function useMusicPlayer(
   }, [songs, resumeLastSong]);
 
   /* =========================================================
+
      GUARDADO PERIÓDICO
+
   ========================================================= */
 
   useEffect(() => {
@@ -379,7 +430,9 @@ export function useMusicPlayer(
   }, [currentSong?.id, queue, shuffle, repeatMode, persist]);
 
   /* =========================================================
+
      CARGAR CANCIÓN
+
   ========================================================= */
 
   const loadSong = useCallback(
@@ -402,6 +455,7 @@ export function useMusicPlayer(
 
       const index = Math.max(
         0,
+
         nextQueue.findIndex((item) => item.id === song.id)
       );
 
@@ -417,11 +471,14 @@ export function useMusicPlayer(
         TrackPlayer.play();
       }
     },
+
     [buildQueueForSong, currentSong, pushHistory]
   );
 
   /* =========================================================
+
      PLAY SONG
+
   ========================================================= */
 
   const playSong = useCallback(
@@ -440,6 +497,7 @@ export function useMusicPlayer(
 
           const index = Math.max(
             0,
+
             nextQueue.findIndex((item) => item.id === song.id)
           );
 
@@ -463,11 +521,14 @@ export function useMusicPlayer(
 
       await loadSong(song, sourceQueue, true);
     },
+
     [currentSong, isPlaying, loadSong, buildQueueForSong, progress.position]
   );
 
   /* =========================================================
+
      PLAY ALL
+
   ========================================================= */
 
   const playAll = useCallback(
@@ -496,11 +557,14 @@ export function useMusicPlayer(
 
       TrackPlayer.play();
     },
+
     []
   );
 
   /* =========================================================
+
      PLAY / PAUSE
+
   ========================================================= */
 
   const pause = useCallback(async () => {
@@ -524,9 +588,13 @@ export function useMusicPlayer(
   }, [currentSong, isPlaying]);
 
   /* =========================================================
+
      SIGUIENTE
+
      RNTP controla el orden nativo. Si shuffle está activo,
+
      RNTP elige la siguiente pista de su cola aleatoria.
+
   ========================================================= */
 
   const next = useCallback(async () => {
@@ -542,17 +610,25 @@ export function useMusicPlayer(
       TrackPlayer.play();
     } catch (error) {
       /*
+
        * Si estamos al final y repeat está apagado,
+
        * no forzamos un salto manual.
+
        */
+
       console.log("No hay siguiente canción:", error);
     }
   }, [currentSong, activeQueue.length]);
 
   /* =========================================================
+
      ANTERIOR
+
      Si la canción ya avanzó más de 3 segundos, vuelve al inicio.
+
      Si no, RNTP retrocede en su propia cola (incluido shuffle).
+
   ========================================================= */
 
   const previous = useCallback(async () => {
@@ -580,7 +656,9 @@ export function useMusicPlayer(
   }, [currentSong, activeQueue.length]);
 
   /* =========================================================
+
      SEEK
+
   ========================================================= */
 
   const seekTo = useCallback(
@@ -600,11 +678,14 @@ export function useMusicPlayer(
 
       TrackPlayer.seekTo(target);
     },
+
     [progress.duration, currentSong?.duration]
   );
 
   /* =========================================================
+
      MODOS: SHUFFLE / REPEAT
+
   ========================================================= */
 
   const toggleShuffle = useCallback(async () => {
@@ -634,8 +715,45 @@ export function useMusicPlayer(
     setRepeatMode(nextMode);
   }, [repeatMode]);
 
+  /*
+   * =========================================================
+   * MODO DE REPRODUCCIÓN DESDE LA NOTIFICACIÓN
+   *
+   * shuffle -> shuffle ON  + repeat OFF
+   * one     -> shuffle OFF + repeat ONE
+   * all     -> shuffle OFF + repeat ALL
+   * =========================================================
+   */
+  const setNotificationPlaybackMode = useCallback(
+    async (mode: "shuffle" | "one" | "all") => {
+      await setupTrackPlayer();
+
+      const nextShuffle = mode === "shuffle";
+
+      const nextRepeat: RepeatMode =
+        mode === "one" ? "one" : mode === "all" ? "all" : "off";
+
+      TrackPlayer.setShuffleEnabled(nextShuffle);
+
+      TrackPlayer.setRepeatMode(
+        nextRepeat === "one"
+          ? TrackRepeatMode.One
+          : nextRepeat === "all"
+          ? TrackRepeatMode.All
+          : TrackRepeatMode.Off
+      );
+
+      setShuffle(nextShuffle);
+
+      setRepeatMode(nextRepeat);
+    },
+    []
+  );
+
   /* =========================================================
+
      REPRODUCIR DESPUÉS
+
   ========================================================= */
 
   const playNext = useCallback(
@@ -673,15 +791,19 @@ export function useMusicPlayer(
 
         TrackPlayer.insertMediaItem(
           Math.max(0, (activeIndex ?? 0) + 1),
+
           songToMediaItem(song)
         );
       }
     },
+
     [activeQueue, songs, currentSong]
   );
 
   /* =========================================================
+
      AÑADIR A COLA
+
   ========================================================= */
 
   const addToQueue = useCallback(
@@ -700,11 +822,14 @@ export function useMusicPlayer(
         TrackPlayer.addMediaItem(songToMediaItem(song));
       }
     },
+
     [queue, activeQueue, currentSong]
   );
 
   /* =========================================================
+
      QUITAR DE COLA
+
   ========================================================= */
 
   const removeFromQueue = useCallback(
@@ -737,11 +862,14 @@ export function useMusicPlayer(
         }
       }
     },
+
     [currentSong, queue, activeQueue]
   );
 
   /* =========================================================
+
      MOVER EN COLA
+
   ========================================================= */
 
   const moveQueueItem = useCallback(
@@ -778,11 +906,14 @@ export function useMusicPlayer(
         TrackPlayer.moveMediaItem(from, to);
       }
     },
+
     [queue, activeQueue, currentSong]
   );
 
   /* =========================================================
+
      LIMPIAR COLA
+
   ========================================================= */
 
   const clearQueue = useCallback(async () => {
@@ -803,9 +934,13 @@ export function useMusicPlayer(
     const activeIndex = TrackPlayer.getActiveMediaItemIndex();
 
     /*
+
      * Quitamos todas las canciones excepto la activa,
+
      * empezando desde el final para no desplazar índices.
+
      */
+
     for (let index = nativeQueue.length - 1; index >= 0; index -= 1) {
       if (index !== activeIndex) {
         TrackPlayer.removeMediaItem(index);
@@ -814,7 +949,9 @@ export function useMusicPlayer(
   }, [currentSong]);
 
   /* =========================================================
+
      ECUALIZADOR NATIVO
+
   ========================================================= */
 
   const getEqualizerInfo =
@@ -826,6 +963,7 @@ export function useMusicPlayer(
     async (enabled: boolean): Promise<HmusicEqualizerInfo> => {
       return await HmusicEqualizer.setEqualizerEnabledAsync(enabled);
     },
+
     []
   );
 
@@ -837,9 +975,11 @@ export function useMusicPlayer(
     ): Promise<HmusicEqualizerInfo> => {
       return await HmusicEqualizer.setEqualizerBandLevelAsync(
         bandIndex,
+
         levelMb
       );
     },
+
     []
   );
 
@@ -847,6 +987,7 @@ export function useMusicPlayer(
     async (levelsMb: number[]): Promise<HmusicEqualizerInfo> => {
       return await HmusicEqualizer.setEqualizerLevelsAsync(levelsMb);
     },
+
     []
   );
 
@@ -888,6 +1029,8 @@ export function useMusicPlayer(
     toggleShuffle,
 
     cycleRepeatMode,
+
+    setNotificationPlaybackMode,
 
     playNext,
 

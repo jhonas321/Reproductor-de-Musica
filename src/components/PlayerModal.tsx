@@ -1,6 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   Animated,
@@ -132,17 +140,59 @@ function FooterAction({
 
 /* =========================================================
 
+
+
+
+
+
+
    TÍTULO CON MARQUEE
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
    - Siempre ocupa una sola línea.
 
+
+
+
+
+
+
    - Si cabe, permanece quieto.
+
+
+
+
+
+
 
    - Si es largo, se desplaza horizontalmente.
 
+
+
+
+
+
+
    - Nunca empuja artista, álbum, progreso ni botones.
+
+
+
+
+
+
 
 ========================================================= */
 
@@ -343,6 +393,153 @@ function LyricsModalConnected({
   );
 }
 
+interface CarouselArtworkProps {
+  song: Song;
+
+  size: number;
+
+  radius: number;
+
+  iconSize: number;
+}
+
+/*
+
+
+
+ * =========================================================
+
+
+
+ * CARÁTULA DEL CARRUSEL SIN FADE
+
+
+
+ * =========================================================
+
+
+
+ *
+
+
+
+ * Artwork.tsx puede aplicar transiciones cuando una imagen
+
+
+
+ * se monta/carga. En el carrusel eso se nota como un flash
+
+
+
+ * de LA MISMA portada cuando la portada vecina pasa a ser
+
+
+
+ * la portada central.
+
+
+
+ *
+
+
+
+ * Aquí las portadas reales se dibujan directamente con Image:
+
+
+
+ * - sin Animated.Image
+
+
+
+ * - sin opacity 0 -> 1
+
+
+
+ * - sin fade
+
+
+
+ *
+
+
+
+ * El componente Artwork normal queda como fallback si la
+
+
+
+ * canción no tiene portada o la imagen realmente falla.
+
+
+
+ */
+
+const CarouselArtwork = memo(function CarouselArtwork({
+  song,
+
+  size,
+
+  radius,
+
+  iconSize,
+}: CarouselArtworkProps) {
+  const normalizedUri =
+    typeof song.artwork === "string" ? song.artwork.trim() : "";
+
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (failedUri && failedUri !== normalizedUri) {
+      setFailedUri(null);
+    }
+  }, [normalizedUri, failedUri]);
+
+  const showRealArtwork =
+    normalizedUri.length > 0 && failedUri !== normalizedUri;
+
+  if (showRealArtwork) {
+    return (
+      <View
+        style={{
+          width: size,
+
+          height: size,
+
+          borderRadius: radius,
+
+          overflow: "hidden",
+
+          backgroundColor: "#121218",
+        }}
+      >
+        <Image
+          key={normalizedUri}
+          source={{
+            uri: normalizedUri,
+          }}
+          resizeMode="cover"
+          fadeDuration={0}
+          onError={() => setFailedUri(normalizedUri)}
+          style={{
+            width: size,
+
+            height: size,
+          }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <Artwork
+      uri={song.artwork}
+      seed={song.id}
+      size={size}
+      radius={radius}
+      iconSize={iconSize}
+    />
+  );
+});
+
 function PlayerModal({
   visible,
 
@@ -378,11 +575,79 @@ function PlayerModal({
 }: Props) {
   const { width, height } = useWindowDimensions();
 
-  const { playlists } = useApp();
+  const { playlists, player } = useApp();
 
   const [playlistOpen, setPlaylistOpen] = useState(false);
 
   const [equalizerOpen, setEqualizerOpen] = useState(false);
+
+  /*
+   * =====================================================
+   * PLAY / PAUSE VISUAL SIN PARPADEO AL CAMBIAR CANCIÓN
+   * =====================================================
+   *
+   * RNTP puede informar `playing = false` durante unos instantes
+   * mientras cambia o bufferiza una pista. Si usamos ese valor
+   * directamente, el botón puede hacer PAUSE -> PLAY -> PAUSE.
+   *
+   * Cuando el usuario cambia de canción mientras está reproduciendo,
+   * mantenemos visualmente PAUSE durante un margen corto. Si pulsa
+   * manualmente play/pause, cancelamos ese margen inmediatamente.
+   */
+  const [keepPauseIcon, setKeepPauseIcon] = useState(false);
+
+  const keepPauseIconTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  const clearKeepPauseIconTimeout = useCallback(() => {
+    if (keepPauseIconTimeoutRef.current) {
+      clearTimeout(keepPauseIconTimeoutRef.current);
+      keepPauseIconTimeoutRef.current = null;
+    }
+  }, []);
+
+  const beginTrackChangeVisual = useCallback(() => {
+    if (!playing) {
+      return;
+    }
+
+    clearKeepPauseIconTimeout();
+    setKeepPauseIcon(true);
+
+    keepPauseIconTimeoutRef.current = setTimeout(() => {
+      setKeepPauseIcon(false);
+      keepPauseIconTimeoutRef.current = null;
+    }, 1200);
+  }, [playing, clearKeepPauseIconTimeout]);
+
+  useEffect(() => {
+    return () => {
+      clearKeepPauseIconTimeout();
+    };
+  }, [clearKeepPauseIconTimeout]);
+
+  const visualPlaying = playing || keepPauseIcon;
+
+  const handlePreviousPress = useCallback(() => {
+    beginTrackChangeVisual();
+    onPrevious();
+  }, [beginTrackChangeVisual, onPrevious]);
+
+  const handleNextPress = useCallback(() => {
+    beginTrackChangeVisual();
+    onNext();
+  }, [beginTrackChangeVisual, onNext]);
+
+  const handleShufflePress = useCallback(() => {
+    void player.toggleShuffle();
+  }, [player.toggleShuffle]);
+
+  const handlePlayPausePress = useCallback(() => {
+    clearKeepPauseIconTimeout();
+    setKeepPauseIcon(false);
+    onPlayPause();
+  }, [clearKeepPauseIconTimeout, onPlayPause]);
 
   const artworkTranslateX = useRef(new Animated.Value(0)).current;
 
@@ -394,7 +659,7 @@ function PlayerModal({
 
 
 
-   * RESPONSIVE
+   * CARRUSEL DE CARÁTULAS
 
 
 
@@ -406,11 +671,509 @@ function PlayerModal({
 
 
 
-   * Ya no dependemos de tamaños gigantes fijos.
+   * anterior | actual | siguiente
 
 
 
    *
+
+
+
+   * Las tres portadas se mueven juntas. Por eso,
+
+
+
+   * mientras la actual sale, la vecina entra desde
+
+
+
+   * el costado en el mismo gesto.
+
+
+
+   */
+
+  const carouselQueue = player.queue;
+
+  /*
+
+
+
+   * =====================================================
+
+
+
+   * ESTADO VISUAL DEL CARRUSEL
+
+
+
+   * =====================================================
+
+
+
+   *
+
+
+
+   * El reproductor puede tardar unos milisegundos en reflejar
+
+
+
+   * la nueva canción. Para evitar el flash entre dos renders,
+
+
+
+   * el carrusel mantiene su propio centro visual.
+
+
+
+   */
+
+  const [visualSongId, setVisualSongId] = useState(song.id);
+
+  /*
+
+
+
+   * =====================================================
+
+
+
+   * SINCRONIZACIÓN ANTI-RACE
+
+
+
+   * =====================================================
+
+
+
+   *
+
+
+
+   * Antes, cada cambio tardío de song.id proveniente de RNTP
+
+
+
+   * podía pisar nuestro estado visual y mostrar una portada
+
+
+
+   * vieja durante un frame.
+
+
+
+   *
+
+
+
+   * Guardamos el destino que el carrusel ya decidió mostrar.
+
+
+
+   * Mientras RNTP todavía no lo confirme, ignoramos estados
+
+
+
+   * atrasados del reproductor.
+
+
+
+   */
+
+  const pendingVisualSongIdRef = useRef<string | null>(null);
+
+  const visualSongIdRef = useRef(song.id);
+
+  useEffect(() => {
+    visualSongIdRef.current = visualSongId;
+  }, [visualSongId]);
+
+  const pendingVisualTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  const clearPendingVisualTimeout = useCallback(() => {
+    if (pendingVisualTimeoutRef.current) {
+      clearTimeout(pendingVisualTimeoutRef.current);
+
+      pendingVisualTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearPendingVisualTimeout();
+    };
+  }, [clearPendingVisualTimeout]);
+
+  useEffect(() => {
+    const pendingId = pendingVisualSongIdRef.current;
+
+    /*
+
+
+
+     * RNTP confirmó exactamente la canción que ya mostramos.
+
+
+
+     * No cambiamos nada visualmente; solo cerramos el pending.
+
+
+
+     */
+
+    if (pendingId && song.id === pendingId) {
+      pendingVisualSongIdRef.current = null;
+
+      clearPendingVisualTimeout();
+
+      return;
+    }
+
+    /*
+
+
+
+     * Hay un swipe visual pendiente y RNTP todavía informa
+
+
+
+     * una canción anterior. Ese valor es obsoleto para la UI:
+
+
+
+     * NO lo copiamos a visualSongId.
+
+
+
+     */
+
+    if (pendingId && song.id !== pendingId) {
+      return;
+    }
+
+    /*
+
+
+
+     * Si no hay transición pendiente, entonces sí aceptamos
+
+
+
+     * cambios externos: botones, notificación, lockscreen, etc.
+
+
+
+     */
+
+    if (song.id !== visualSongIdRef.current) {
+      setVisualSongId(song.id);
+    }
+  }, [song.id, clearPendingVisualTimeout]);
+
+  /*
+
+
+
+   * RE-CENTRADO SIN FLASH
+
+
+
+   *
+
+
+
+   * IMPORTANTE:
+
+
+
+   * useLayoutEffect corre después de que React ya cambió
+
+
+
+   * las portadas del carrusel, pero antes de que la pantalla
+
+
+
+   * pinte ese nuevo frame.
+
+
+
+   *
+
+
+
+   * Así evitamos hacer translateX=0 mientras todavía están
+
+
+
+   * montadas las portadas antiguas.
+
+
+
+   */
+
+  useLayoutEffect(() => {
+    artworkTranslateX.stopAnimation();
+
+    artworkTranslateX.setValue(0);
+  }, [visualSongId, artworkTranslateX]);
+
+  /*
+
+   * =====================================================
+
+   * CANCIÓN VISUAL RESUELTA SIN RETARDO
+
+   * =====================================================
+
+   *
+
+   * Si NO estamos en medio de un swipe optimista, usamos
+
+   * directamente `song.id` en este mismo render.
+
+   *
+
+   * Antes el fondo ya recibía el nuevo `song`, pero la carátula
+
+   * esperaba a que el useEffect copiara song.id -> visualSongId.
+
+   * Eso podía hacer que el fondo cambiara primero y la portada
+
+   * pareciera llegar tarde.
+
+   *
+
+   * Durante un swipe pendiente sí conservamos visualSongId,
+
+   * porque ahí queremos mostrar inmediatamente la canción destino
+
+   * aunque RNTP todavía no la haya confirmado.
+
+   */
+
+  const resolvedVisualSongId = pendingVisualSongIdRef.current
+    ? visualSongId
+    : song.id;
+
+  const visualCarouselIndex = carouselQueue.findIndex(
+    (item) => item.id === resolvedVisualSongId
+  );
+
+  useEffect(() => {
+    if (visualCarouselIndex < 0 && !pendingVisualSongIdRef.current) {
+      /*
+
+       * No forzamos un cambio visual aquí.
+
+       *
+
+       * visualCurrentSong ya cae en `song`, así que cambiar
+
+       * visualSongId en este instante podía provocar un render
+
+       * extra y un pequeño flash. La sincronización normal de
+
+       * song.id se encargará del siguiente estado estable.
+
+       */
+
+      return;
+    }
+  }, [visualCarouselIndex]);
+
+  const canWrapCarousel = repeatMode === "all" && carouselQueue.length > 1;
+
+  const visualCurrentSong =
+    visualCarouselIndex >= 0 ? carouselQueue[visualCarouselIndex] : song;
+
+  /*
+   * =====================================================
+   * VECINOS DEL CARRUSEL EN MODO ALEATORIO
+   * =====================================================
+   *
+   * Cuando Shuffle está activo no mostramos simplemente
+   * la canción anterior/siguiente del orden normal.
+   *
+   * Generamos dos candidatos aleatorios ESTABLES para la
+   * canción visual actual. Así la portada que aparece al
+   * costado es exactamente la que se reproducirá al hacer
+   * swipe.
+   *
+   * useMemo evita que cambien por renders normales.
+   * Solo se recalculan cuando cambia:
+   * - la canción visual actual
+   * - el estado de shuffle
+   * - la cola
+   */
+  const shuffleCarouselNeighbors = useMemo(() => {
+    if (!player.shuffle || carouselQueue.length <= 1) {
+      return {
+        previous: null as Song | null,
+        next: null as Song | null,
+      };
+    }
+
+    const candidates = carouselQueue.filter(
+      (item) => item.id !== visualCurrentSong.id
+    );
+
+    if (candidates.length === 0) {
+      return {
+        previous: null as Song | null,
+        next: null as Song | null,
+      };
+    }
+
+    const nextIndex = Math.floor(Math.random() * candidates.length);
+    const next = candidates[nextIndex] ?? null;
+
+    const previousCandidates =
+      candidates.length > 1
+        ? candidates.filter((item) => item.id !== next?.id)
+        : candidates;
+
+    const previousIndex =
+      previousCandidates.length > 0
+        ? Math.floor(Math.random() * previousCandidates.length)
+        : 0;
+
+    const previous = previousCandidates[previousIndex] ?? next ?? null;
+
+    return {
+      previous,
+      next,
+    };
+  }, [player.shuffle, carouselQueue, visualCurrentSong.id]);
+
+  const previousCarouselSong = player.shuffle
+    ? shuffleCarouselNeighbors.previous
+    : visualCarouselIndex > 0
+    ? carouselQueue[visualCarouselIndex - 1]
+    : canWrapCarousel
+    ? carouselQueue[carouselQueue.length - 1]
+    : null;
+
+  const nextCarouselSong = player.shuffle
+    ? shuffleCarouselNeighbors.next
+    : visualCarouselIndex >= 0 && visualCarouselIndex < carouselQueue.length - 1
+    ? carouselQueue[visualCarouselIndex + 1]
+    : canWrapCarousel && carouselQueue.length > 0
+    ? carouselQueue[0]
+    : null;
+
+  /*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * RESPONSIVE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   *
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * Ya no dependemos de tamaños gigantes fijos.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   *
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -418,7 +1181,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    *
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -426,11 +1213,47 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * 2. Pantalla normal
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * 3. Pantalla grande
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -448,7 +1271,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * La portada depende tanto del ancho como
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -456,7 +1303,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    *
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -464,7 +1335,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * la portada empuje los controles fuera.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -496,7 +1391,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * Tamaños de botones.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -514,7 +1433,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * Textos.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -528,33 +1471,27 @@ function PlayerModal({
 
   const [lyricsOpen, setLyricsOpen] = useState(false);
 
-  useEffect(() => {
-    setLyricsOpen(false);
-
-    setPlaylistOpen(false);
-
-    setEqualizerOpen(false);
-
-    artworkTranslateX.stopAnimation();
-
-    artworkTranslateX.setValue(0);
-  }, [song.id, artworkTranslateX]);
-
   /*
 
+   * =====================================================
 
+   * FONDO SIMPLE / ESTABLE
 
    * =====================================================
 
+   *
 
+   * Volvemos al comportamiento de la versión que funcionaba bien:
 
-   * FONDO DINÁMICO
+   * el fondo depende SOLO de `song` (la canción real confirmada),
 
+   * no del estado visual optimista del carrusel.
 
+   *
 
-   * =====================================================
+   * Así el carrusel puede ser fluido sin que el fondo haga
 
-
+   * buffers, precargas, dobles capas ni carreras de onLoad.
 
    */
 
@@ -562,16 +1499,91 @@ function PlayerModal({
     null
   );
 
-  const normalizedArtwork =
+  const normalizedBackgroundArtwork =
     typeof song.artwork === "string" ? song.artwork.trim() : "";
 
   const backgroundArtworkFailed =
-    normalizedArtwork.length > 0 && failedBackgroundUri === normalizedArtwork;
+    normalizedBackgroundArtwork.length > 0 &&
+    failedBackgroundUri === normalizedBackgroundArtwork;
 
   const hasRealBackground =
-    normalizedArtwork.length > 0 && !backgroundArtworkFailed;
+    normalizedBackgroundArtwork.length > 0 && !backgroundArtworkFailed;
 
-  const artworkTheme = getArtworkTheme(song.id);
+  const backgroundTheme = getArtworkTheme(song.id);
+
+  useEffect(() => {
+    setLyricsOpen(false);
+
+    setPlaylistOpen(false);
+
+    setEqualizerOpen(false);
+  }, [song.id]);
+
+  /*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * FONDO DINÁMICO
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   */
 
   const handleClose = useCallback(() => {
     setLyricsOpen(false);
@@ -584,17 +1596,51 @@ function PlayerModal({
   }, [onClose]);
 
   /*
+
+
+
    * =====================================================
+
+
+
    * GESTO SOBRE LA CARÁTULA
+
+
+
    * =====================================================
+
+
+
    *
+
+
+
    * Deslizar a la izquierda  -> siguiente canción
+
+
+
    * Deslizar a la derecha    -> canción anterior
+
+
+
    *
+
+
+
    * Exigimos un movimiento horizontal claro para que
+
+
+
    * pequeños toques o movimientos verticales no cambien
+
+
+
    * de canción accidentalmente.
+
+
+
    */
+
   const artworkSwipeDistance = Math.min(
     82,
 
@@ -604,6 +1650,58 @@ function PlayerModal({
       width * 0.14
     )
   );
+
+  const artworkCarouselGap = veryNarrow ? 12 : 16;
+
+  const artworkPageDistance = artworkSize + artworkCarouselGap;
+
+  const previousArtworkScale = artworkTranslateX.interpolate({
+    inputRange: [-artworkPageDistance, 0, artworkPageDistance],
+
+    outputRange: [0.9, 0.94, 1],
+
+    extrapolate: "clamp",
+  });
+
+  const currentArtworkScale = artworkTranslateX.interpolate({
+    inputRange: [-artworkPageDistance, 0, artworkPageDistance],
+
+    outputRange: [0.94, 1, 0.94],
+
+    extrapolate: "clamp",
+  });
+
+  const nextArtworkScale = artworkTranslateX.interpolate({
+    inputRange: [-artworkPageDistance, 0, artworkPageDistance],
+
+    outputRange: [1, 0.94, 0.9],
+
+    extrapolate: "clamp",
+  });
+
+  const previousArtworkOpacity = artworkTranslateX.interpolate({
+    inputRange: [-artworkPageDistance, 0, artworkPageDistance],
+
+    outputRange: [0.3, 0.72, 1],
+
+    extrapolate: "clamp",
+  });
+
+  const currentArtworkOpacity = artworkTranslateX.interpolate({
+    inputRange: [-artworkPageDistance, 0, artworkPageDistance],
+
+    outputRange: [0.72, 1, 0.72],
+
+    extrapolate: "clamp",
+  });
+
+  const nextArtworkOpacity = artworkTranslateX.interpolate({
+    inputRange: [-artworkPageDistance, 0, artworkPageDistance],
+
+    outputRange: [1, 0.72, 0.3],
+
+    extrapolate: "clamp",
+  });
 
   const animateArtworkBack = useCallback(() => {
     Animated.spring(
@@ -623,40 +1721,205 @@ function PlayerModal({
 
   const finishArtworkSwipe = useCallback(
     (direction: "next" | "previous") => {
+      const targetSong =
+        direction === "next" ? nextCarouselSong : previousCarouselSong;
+
+      if (!targetSong) {
+        animateArtworkBack();
+
+        return;
+      }
+
+      beginTrackChangeVisual();
+
       Animated.timing(
         artworkTranslateX,
 
         {
-          toValue: direction === "next" ? -width : width,
+          toValue:
+            direction === "next" ? -artworkPageDistance : artworkPageDistance,
 
-          duration: 150,
+          duration: 170,
 
           easing: Easing.out(Easing.quad),
 
           useNativeDriver: true,
         }
       ).start(() => {
-        artworkTranslateX.setValue(0);
+        /*
 
-        if (direction === "next") {
-          onNext();
-        } else {
-          onPrevious();
-        }
+
+
+         * HANDOFF SIN FLASH
+
+
+
+         *
+
+
+
+         * La portada vecina ya está centrada al terminar
+
+
+
+         * la animación. Ahora convertimos esa misma canción
+
+
+
+         * en el centro visual y devolvemos la pista a 0
+
+
+
+         * antes de pedirle a RNTP que cambie.
+
+
+
+         *
+
+
+
+         * Visualmente no hay cambio: es la misma portada
+
+
+
+         * ocupando exactamente el mismo lugar.
+
+
+
+         */
+
+        /*
+
+
+
+         * Marcamos primero el destino esperado.
+
+
+
+         * Si RNTP todavía emite temporalmente la canción
+
+
+
+         * anterior, el efecto de sincronización la ignorará.
+
+
+
+         */
+
+        clearPendingVisualTimeout();
+
+        pendingVisualSongIdRef.current = targetSong.id;
+
+        const expectedVisualSongId = targetSong.id;
+
+        pendingVisualTimeoutRef.current = setTimeout(() => {
+          if (pendingVisualSongIdRef.current === expectedVisualSongId) {
+            /*
+
+             * Seguridad solamente lógica:
+
+             * liberamos el pending, pero NO tocamos la portada
+
+             * visible. Así evitamos un rollback visual momentáneo
+
+             * que producía pequeños flashes.
+
+             */
+
+            pendingVisualSongIdRef.current = null;
+          }
+
+          pendingVisualTimeoutRef.current = null;
+        }, 2500);
+
+        setVisualSongId(targetSong.id);
+
+        /*
+
+         * IMPORTANTE:
+
+         * El swipe ya NO manda next() ni previous().
+
+         *
+
+         * Enviamos directamente el ID exacto de la portada
+
+         * que quedó centrada. Así audio, portada, título,
+
+         * artista, álbum y fondo terminan en la misma canción.
+
+         */
+
+        void (async () => {
+          const success = await player.skipToSong(targetSong.id);
+
+          /*
+
+           * Si por alguna razón RNTP no pudo encontrar/saltar
+
+           * a ese mediaId, soltamos el pending visual.
+
+           *
+
+           * Solo lo hacemos si este sigue siendo el último
+
+           * destino solicitado; un swipe posterior no se toca.
+
+           */
+
+          if (!success && pendingVisualSongIdRef.current === targetSong.id) {
+            pendingVisualSongIdRef.current = null;
+
+            setVisualSongId(player.currentSong?.id ?? song.id);
+          }
+        })();
       });
     },
 
-    [artworkTranslateX, width, onNext, onPrevious]
+    [
+      artworkTranslateX,
+
+      artworkPageDistance,
+
+      nextCarouselSong,
+
+      previousCarouselSong,
+
+      player.skipToSong,
+
+      player.currentSong?.id,
+
+      song.id,
+
+      clearPendingVisualTimeout,
+
+      animateArtworkBack,
+
+      beginTrackChangeVisual,
+    ]
   );
 
   const artworkPanResponder = useMemo(
     () =>
       PanResponder.create({
         /*
+
+
+
          * La carátula no tiene acción de toque, por eso
+
+
+
          * podemos tomar el responder desde el inicio.
+
+
+
          * Así Android no entrega el gesto a otro View.
+
+
+
          */
+
         onStartShouldSetPanResponder: () => true,
 
         onStartShouldSetPanResponderCapture: () => true,
@@ -675,10 +1938,23 @@ function PlayerModal({
           gestureState
         ) => {
           /*
+
+
+
            * Seguimos el dedo en tiempo real.
+
+
+
            * Limitamos un poco el recorrido vertical
+
+
+
            * porque solo nos interesa dx.
+
+
+
            */
+
           artworkTranslateX.setValue(gestureState.dx);
         },
 
@@ -730,10 +2006,10 @@ function PlayerModal({
 
   const addCurrentSongToPlaylist = useCallback(
     (playlistId: string) => {
-      playlists.addSong(playlistId, song.id);
+      playlists.addSong(playlistId, visualCurrentSong.id);
     },
 
-    [playlists, song.id]
+    [playlists, visualCurrentSong.id]
   );
 
   return (
@@ -749,7 +2025,31 @@ function PlayerModal({
 
 
 
-              FONDO
+
+
+
+
+
+
+
+
+
+
+
+
+              FONDO AISLADO DEL CARRUSEL
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -762,7 +2062,7 @@ function PlayerModal({
                   styles.generatedBackground,
 
                   {
-                    backgroundColor: artworkTheme.background,
+                    backgroundColor: backgroundTheme.background,
                   },
                 ]}
               />
@@ -772,7 +2072,7 @@ function PlayerModal({
                   styles.generatedGlowOne,
 
                   {
-                    backgroundColor: artworkTheme.glow1,
+                    backgroundColor: backgroundTheme.glow1,
                   },
                 ]}
               />
@@ -782,7 +2082,7 @@ function PlayerModal({
                   styles.generatedGlowTwo,
 
                   {
-                    backgroundColor: artworkTheme.glow2,
+                    backgroundColor: backgroundTheme.glow2,
                   },
                 ]}
               />
@@ -792,7 +2092,7 @@ function PlayerModal({
                   styles.generatedGlowThree,
 
                   {
-                    backgroundColor: artworkTheme.glow1,
+                    backgroundColor: backgroundTheme.glow1,
                   },
                 ]}
               />
@@ -803,15 +2103,15 @@ function PlayerModal({
 
           {hasRealBackground ? (
             <Image
-              key={normalizedArtwork}
+              key={normalizedBackgroundArtwork}
               source={{
-                uri: normalizedArtwork,
+                uri: normalizedBackgroundArtwork,
               }}
               blurRadius={45}
               resizeMode="cover"
               fadeDuration={0}
               onError={() => {
-                setFailedBackgroundUri(normalizedArtwork);
+                setFailedBackgroundUri(normalizedBackgroundArtwork);
               }}
               style={styles.backgroundImage}
             />
@@ -840,7 +2140,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                 CABECERA
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -885,7 +2209,7 @@ function PlayerModal({
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {song.artist}
+                  {visualCurrentSong.artist}
                 </Text>
               </View>
 
@@ -916,7 +2240,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                 CONTENIDO PRINCIPAL
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -935,7 +2283,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                   CARÁTULA
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -954,14 +2326,15 @@ function PlayerModal({
               >
                 <Animated.View
                   style={[
-                    styles.artworkShell,
+                    styles.artworkTrack,
 
                     {
-                      width: artworkSize,
+                      width: artworkSize * 3 + artworkCarouselGap * 2,
 
                       height: artworkSize,
 
-                      borderRadius: artworkRadius,
+                      marginLeft:
+                        -(artworkSize * 3 + artworkCarouselGap * 2) / 2,
 
                       transform: [
                         {
@@ -974,14 +2347,129 @@ function PlayerModal({
                   accessibilityRole="adjustable"
                   accessibilityLabel="Carátula. Desliza a la izquierda para la siguiente canción o a la derecha para la anterior."
                 >
-                  <Artwork
-                    key={song.id}
-                    uri={song.artwork}
-                    seed={song.id}
-                    size={artworkSize}
-                    radius={artworkRadius}
-                    iconSize={artworkIconSize}
+                  {/*
+
+                   * POSICIONES FIJAS DEL CARRUSEL
+
+                   *
+
+                   * Android puede conservar el bitmap viejo cuando
+
+                   * una misma instancia Image cambia de posición.
+
+                   * Por eso previous/current/next son slots fijos.
+
+                   */}
+
+                  <Animated.View
+                    key="carousel-previous-slot"
+                    pointerEvents="none"
+                    style={[
+                      styles.artworkCarouselItem,
+
+                      {
+                        width: artworkSize,
+
+                        height: artworkSize,
+
+                        borderRadius: artworkRadius,
+
+                        opacity: previousArtworkOpacity,
+
+                        transform: [
+                          {
+                            scale: previousArtworkScale,
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    {previousCarouselSong ? (
+                      <CarouselArtwork
+                        song={previousCarouselSong}
+                        size={artworkSize}
+                        radius={artworkRadius}
+                        iconSize={artworkIconSize}
+                      />
+                    ) : null}
+                  </Animated.View>
+
+                  <View
+                    style={{
+                      width: artworkCarouselGap,
+                    }}
                   />
+
+                  <Animated.View
+                    key="carousel-current-slot"
+                    pointerEvents="none"
+                    style={[
+                      styles.artworkCarouselItem,
+
+                      {
+                        width: artworkSize,
+
+                        height: artworkSize,
+
+                        borderRadius: artworkRadius,
+
+                        opacity: currentArtworkOpacity,
+
+                        transform: [
+                          {
+                            scale: currentArtworkScale,
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    <CarouselArtwork
+                      key={`current-${resolvedVisualSongId}`}
+                      song={visualCurrentSong}
+                      size={artworkSize}
+                      radius={artworkRadius}
+                      iconSize={artworkIconSize}
+                    />
+                  </Animated.View>
+
+                  <View
+                    style={{
+                      width: artworkCarouselGap,
+                    }}
+                  />
+
+                  <Animated.View
+                    key="carousel-next-slot"
+                    pointerEvents="none"
+                    style={[
+                      styles.artworkCarouselItem,
+
+                      {
+                        width: artworkSize,
+
+                        height: artworkSize,
+
+                        borderRadius: artworkRadius,
+
+                        opacity: nextArtworkOpacity,
+
+                        transform: [
+                          {
+                            scale: nextArtworkScale,
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    {nextCarouselSong ? (
+                      <CarouselArtwork
+                        song={nextCarouselSong}
+                        size={artworkSize}
+                        radius={artworkRadius}
+                        iconSize={artworkIconSize}
+                      />
+                    ) : null}
+                  </Animated.View>
                 </Animated.View>
               </View>
 
@@ -989,7 +2477,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                   INFORMACIÓN
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1007,7 +2519,8 @@ function PlayerModal({
                 ]}
               >
                 <MarqueeTitle
-                  text={song.title}
+                  key={`title-${resolvedVisualSongId}`}
+                  text={visualCurrentSong.title}
                   fontSize={titleFontSize}
                   lineHeight={titleLineHeight}
                 />
@@ -1025,7 +2538,7 @@ function PlayerModal({
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {song.artist}
+                  {visualCurrentSong.artist}
                 </Text>
 
                 <View
@@ -1048,7 +2561,7 @@ function PlayerModal({
                     numberOfLines={1}
                     ellipsizeMode="tail"
                   >
-                    {song.album}
+                    {visualCurrentSong.album}
                   </Text>
                 </View>
               </View>
@@ -1057,7 +2570,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                   PROGRESO
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1081,7 +2618,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                   CONTROLES
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1115,7 +2676,7 @@ function PlayerModal({
                     shuffle && styles.secondaryControlActive,
                   ]}
                   activeOpacity={0.7}
-                  onPress={onShuffle}
+                  onPress={handleShufflePress}
                   accessibilityRole="button"
                   accessibilityLabel={
                     shuffle
@@ -1143,7 +2704,7 @@ function PlayerModal({
                     },
                   ]}
                   activeOpacity={0.68}
-                  onPress={onPrevious}
+                  onPress={handlePreviousPress}
                   accessibilityRole="button"
                   accessibilityLabel="Canción anterior"
                 >
@@ -1167,12 +2728,12 @@ function PlayerModal({
                     },
                   ]}
                   activeOpacity={0.82}
-                  onPress={onPlayPause}
+                  onPress={handlePlayPausePress}
                   accessibilityRole="button"
-                  accessibilityLabel={playing ? "Pausar" : "Reproducir"}
+                  accessibilityLabel={visualPlaying ? "Pausar" : "Reproducir"}
                 >
                   <MaterialCommunityIcons
-                    name={playing ? "pause" : "play"}
+                    name={visualPlaying ? "pause" : "play"}
                     size={playIconSize}
                     color={COLORS.white}
                   />
@@ -1189,7 +2750,7 @@ function PlayerModal({
                     },
                   ]}
                   activeOpacity={0.68}
-                  onPress={onNext}
+                  onPress={handleNextPress}
                   accessibilityRole="button"
                   accessibilityLabel="Siguiente canción"
                 >
@@ -1244,7 +2805,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                 FOOTER
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1305,7 +2890,31 @@ function PlayerModal({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
                 AGREGAR A PLAYLIST
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1328,7 +2937,7 @@ function PlayerModal({
                       </Text>
 
                       <Text style={styles.playlistSubtitle} numberOfLines={1}>
-                        {song.title}
+                        {visualCurrentSong.title}
                       </Text>
                     </View>
 
@@ -1369,7 +2978,9 @@ function PlayerModal({
                       showsVerticalScrollIndicator={false}
                     >
                       {playlists.playlists.map((playlist) => {
-                        const alreadyAdded = playlist.songIds.includes(song.id);
+                        const alreadyAdded = playlist.songIds.includes(
+                          visualCurrentSong.id
+                        );
 
                         return (
                           <TouchableOpacity
@@ -1470,7 +3081,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1478,13 +3113,49 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
    */
 
   generatedBackground: {
+    position: "absolute",
+
+    top: 0,
+
+    left: 0,
+
+    right: 0,
+
+    bottom: 0,
+  },
+
+  backgroundLayer: {
     position: "absolute",
 
     top: 0,
@@ -1594,7 +3265,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1602,7 +3297,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1684,7 +3403,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1692,7 +3435,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1712,7 +3479,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1720,7 +3511,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1734,9 +3549,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
 
     flexShrink: 0,
+
+    overflow: "hidden",
   },
 
-  artworkShell: {
+  artworkTrack: {
+    position: "absolute",
+
+    left: "50%",
+
+    top: 0,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+  },
+
+  artworkCarouselItem: {
     overflow: "hidden",
 
     backgroundColor: COLORS.surface,
@@ -1752,7 +3581,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1760,7 +3613,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1842,7 +3719,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1850,7 +3751,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1866,7 +3791,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1874,7 +3823,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1948,7 +3921,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1956,7 +3953,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2042,7 +4063,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2050,7 +4095,31 @@ const styles = StyleSheet.create({
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
    * =====================================================
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
